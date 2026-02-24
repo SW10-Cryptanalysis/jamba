@@ -1,26 +1,25 @@
-from transformers import AutoTokenizer, AutoModelForCausalLM
-import torch
+from transformers import JambaConfig, JambaForCausalLM
 
-model_name = "ai21labs/Jamba-v0.1"
+def get_jamba_model(config):
+    # JambaConfig uses specific parameters for its hybrid architecture
+    conf = JambaConfig(
+        vocab_size=config.vocab_size,
+        hidden_size=config.dims,
+        num_hidden_layers=config.layers,
+        intermediate_size=config.dims * 4, # Standard MLP expansion
+        num_attention_heads=config.dims // 64, # Standard head dimension
+        num_key_value_heads=1, # Uses Grouped Query Attention
+        attn_layer_period=8, # One attention layer every 8 layers
+        attn_layer_offset=4,
+        num_experts=1, # Set to 1 for a dense model, or e.g., 4-8 for a small MoE
+        num_experts_per_tok=1,
+        max_position_embeddings=config.max_context,
+        use_mamba_kernels=True # Assumes mamba-ssm is installed
+    )
+    
+    model = JambaForCausalLM(conf)
+    print("Jamba Model loaded!")
+    print(f"Parameters:       {model.num_parameters():,}")
+    print(f"VRAM for Weights: {(model.get_memory_footprint() / 1e9):.4f} GB")
 
-tokenizer = AutoTokenizer.from_pretrained(model_name)
-model = AutoModelForCausalLM.from_pretrained(
-    model_name,
-    torch_dtype=torch.bfloat16,
-    device_map="auto"
-)
-
-prompt = open("cipher_prompt.txt").read()
-
-inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
-
-out = model.generate(
-    **inputs,
-    max_new_tokens=1200,
-    temperature=0.15,
-    top_p=0.9,
-    repetition_penalty=1.1,
-    do_sample=True
-)
-
-print(tokenizer.decode(out[0], skip_special_tokens=True))
+    return model
