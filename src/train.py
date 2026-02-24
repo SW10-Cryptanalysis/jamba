@@ -1,5 +1,6 @@
 from transformers import JambaConfig, JambaForCausalLM, TrainingArguments, Trainer
 from data_prep import prepare_data  # Ensure this import matches your filename
+from pathlib import Path
 
 # 1. Configure the Small Jamba Model
 config = JambaConfig(
@@ -33,7 +34,11 @@ training_args = TrainingArguments(
 
 # 3. Load Data
 # Ensure the path points to where your .txt files are stored
-train_ds, eval_ds = prepare_data("./ciphers/") 
+data_dir = Path(__file__).parent.parent.parent.parent / "Ciphers"
+train_data_dir: Path = data_dir / "Training"
+valid_data_dir: Path = data_dir / "Validation"
+train_ds = prepare_data(train_data_dir)
+eval_ds = prepare_data(valid_data_dir)
 
 # 4. Initialize Trainer
 trainer = Trainer(
