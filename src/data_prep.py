@@ -1,76 +1,78 @@
-import os
 import json
 import torch
-from torch.utils.data import Dataset, DataLoader
-from sklearn.model_selection import train_test_split
-import glob
+from torch.utils.data import Dataset
+from pathlib import Path
 
 class HomophonicCipherDataset(Dataset):
-    def __init__(self, file_paths, max_len=1024):
+    def __init__(self, file_paths, max_len=10240):
         self.file_paths = file_paths
         self.max_len = max_len
-        
-        # Mapping: 'a' -> 256, 'b' -> 257, ..., 'z' -> 281
-        self.char_to_id = {chr(i + 97): i + 256 for i in range(26)}
-        
+
+        # --- VOCABULARY MAPPING ---
+        # Homophones: 0 to 3000
+        # Plaintext (a-z): 3001 to 3026
+        self.char_to_id = {chr(i + 97): i + 3001 for i in range(26)}
+
         # Special Tokens
-        self.PAD_ID = 282
-        self.BOS_ID = 283
-        self.EOS_ID = 284
-        self.SEP_ID = 285
+        self.PAD_ID = 3027
+        self.BOS_ID = 3028
+        self.EOS_ID = 3029
+        self.SEP_ID = 3030
 
     def __len__(self):
         return len(self.file_paths)
 
     def __getitem__(self, idx):
+        # Read JSON
         with open(self.file_paths[idx], 'r') as f:
             data = json.load(f)
-            
-        # FIX: Ensure cipher_ids is a list of integers
+
+        # Process Ciphertext
         cipher_ids = data['ciphertext']
         if isinstance(cipher_ids, str):
-            # If it's a string of numbers like "106 136 174", split and convert
             cipher_ids = [int(x) for x in cipher_ids.split()]
-        
-        # 2. Process Plaintext (convert chars to our 256+ range)
-        # Only keeping alphabetic characters for this specific task
+
+        # Safety clip: ensure no cipher ID exceeds 3000
+        cipher_ids = [min(c, 3000) for c in cipher_ids]
+
+        # Process Plaintext
         plain_text = data['plaintext'].lower()
         plain_ids = [self.char_to_id[c] for c in plain_text if c in self.char_to_id]
-        
-        # 3. Construct Input: <BOS> CIPHER <SEP> PLAIN <EOS>
-        # Format for Causal LM: The model sees cipher, then predicts plain
+
+        # Construct Sequence: <BOS> CIPHER <SEP> PLAIN <EOS>
         full_seq = [self.BOS_ID] + cipher_ids + [self.SEP_ID] + plain_ids + [self.EOS_ID]
-        
-        # 4. Construct Labels
-        # We want the loss to only be calculated on the plaintext portion.
-        # Use -100 for parts we want to ignore (the cipher and sep).
-        cipher_part_len = len(cipher_ids) + 2 # BOS + Cipher + SEP
+
+        # Labels: -100 for the cipher part (we only want to calculate loss on the plaintext prediction)
+        cipher_part_len = len(cipher_ids) + 2
         labels = ([-100] * cipher_part_len) + plain_ids + [self.EOS_ID]
-        
-        # 5. Padding and Truncation
+
+        # Truncation
         input_ids = full_seq[:self.max_len]
         labels = labels[:self.max_len]
-        
+
+        # Padding & Attention Mask
         padding_len = self.max_len - len(input_ids)
+        attention_mask = [1] * len(input_ids)
+
         if padding_len > 0:
             input_ids += [self.PAD_ID] * padding_len
             labels += [-100] * padding_len
-            
+            attention_mask += [0] * padding_len
+
         return {
             "input_ids": torch.tensor(input_ids, dtype=torch.long),
+            "attention_mask": torch.tensor(attention_mask, dtype=torch.long),
             "labels": torch.tensor(labels, dtype=torch.long)
         }
 
-def prepare_data(folder_path, test_size=0.1):
-    # Get all .txt or .json files in the folder
-    files = glob.glob(os.path.join(folder_path, "*.json")) # change extension if needed
-    
-    train_files, val_files = train_test_split(files, test_size=test_size, random_state=42)
-    
-    train_dataset = HomophonicCipherDataset(train_files)
-    val_dataset = HomophonicCipherDataset(val_files)
-    
-    return train_dataset, val_dataset
+def prepare_data(folder_path, max_len=10240):
+    path = Path(folder_path)
 
-# Usage:
-# train_ds, val_ds = prepare_data("ciphers")
+    # Locate all json files (handles uppercase/lowercase extensions)
+    files = list(path.rglob("*.json")) + list(path.rglob("*.JSON"))
+
+    if len(files) == 0:
+        raise ValueError(f"No .json files found in {path.resolve()}. Check your folder structure!")
+
+    print(f"Successfully loaded {len(files)} files from {path.name}")
+    return HomophonicCipherDataset(files, max_len=max_len)
