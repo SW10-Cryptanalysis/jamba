@@ -6,17 +6,33 @@ from pathlib import Path
 from transformers import JambaConfig, JambaForCausalLM, TrainingArguments, Trainer
 from data_prep import prepare_data
 
-# --- DIAGNOSTIC PRINT ---
-# This lets us verify the environment without crashing if something is wrong
+# Checks for mamba kernels
 try:
-    import mamba_ssm
-    import causal_conv1d
-    print(f"✅ Environment Check: Mamba-ssm {mamba_ssm.__version__}, Causal-conv1d {causal_conv1d.__version__}")
-except ImportError as e:
-    print(f"⚠️ Environment Warning: Kernels not found ({e}). Training will be slow.")
+    # Mamba 2.x moved these around. We import them from the new locations
+    # and map them to what Jamba (transformers) expects.
+    import mamba_ssm.ops.selective_scan_interface as mamba_1_style
+    from causal_conv1d import causal_conv1d_fn, causal_conv1d_update
+
+    try:
+        from mamba_ssm.ops.triton.selective_state_update import selective_state_update
+    except ImportError:
+        from mamba_ssm.ops.triton.ssd_combined import mamba_split_conv_open_loop_scan_combined as selective_state_update
+
+    import transformers.models.jamba.modeling_jamba as jamba_mod
+
+    # Injecting the kernels from the v2.3.0 installation
+    jamba_mod.mamba_inner_fn = mamba_1_style.mamba_inner_fn
+    jamba_mod.selective_scan_fn = mamba_1_style.selective_scan_fn
+    jamba_mod.selective_state_update = selective_state_update
+    jamba_mod.causal_conv1d_fn = causal_conv1d_fn
+    jamba_mod.causal_conv1d_update = causal_conv1d_update
+
+    jamba_mod.is_fast_path_available = True
+    print("🚀 MAMBA 2.3.0 DETECTED: Successfully bridged kernels for Jamba.")
+except Exception as e:
+    print(f"⚠️ Kernel Bridge failed: {e}")
 
 # 1. CONFIGURATION
-# We explicitly disable cache to save VRAM for the 10k sequence length
 config = JambaConfig(
     vocab_size=4096,
     hidden_size=256,
@@ -31,23 +47,21 @@ config = JambaConfig(
     expert_retrieval_size=256,
     max_position_embeddings=10240,
 
-    use_mamba_kernels=True, # Attempt to use kernels
+    use_mamba_kernels=True,
     use_cache=False
 )
 
 # 2. MODEL INITIALIZATION
 print("Initializing Model...")
-model = JambaForCausalLM(config).to("cuda")
+model = JambaForCausalLM(config).to(dtype=torch.bfloat16, device="cuda")
 
 # 3. TRAINING ARGUMENTS
 training_args = TrainingArguments(
     output_dir="./jamba-cipher-results",
 
-    # Batch size tweaks for 10k context
     per_device_train_batch_size=2,
     gradient_accumulation_steps=8,
     gradient_checkpointing=True,
-
     num_train_epochs=3,
     learning_rate=3e-4,
     logging_steps=50,
