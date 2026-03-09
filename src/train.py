@@ -5,6 +5,7 @@ from mamba_ssm import Mamba
 from pathlib import Path
 from transformers import JambaConfig, JambaForCausalLM, TrainingArguments, Trainer
 from data_prep import prepare_data
+from jamba_utils import prepare_checkpoint_for_fast_path
 
 # Checks for mamba kernels
 try:
@@ -93,5 +94,9 @@ trainer = Trainer(
     eval_dataset=eval_ds,
 )
 
+# 6. FIND CHECKPOINT
+print("Preparing checkpoint for Fast Path compatibility...")
+prepare_checkpoint_for_fast_path(training_args.output_dir)
+
 print("Starting Training...")
-trainer.train()
+trainer.train(resume_from_checkpoint=True)
