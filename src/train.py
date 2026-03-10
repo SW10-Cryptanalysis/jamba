@@ -2,15 +2,14 @@ import os
 import torch
 import mamba_ssm
 from mamba_ssm import Mamba
-from pathlib import Path
 from transformers import JambaConfig, JambaForCausalLM, TrainingArguments, Trainer
+
+from config import cfg
 from data_prep import prepare_data
 from jamba_utils import prepare_checkpoint_for_fast_path
 
 # Checks for mamba kernels
 try:
-    # Mamba 2.x moved these around. We import them from the new locations
-    # and map them to what Jamba (transformers) expects.
     import mamba_ssm.ops.selective_scan_interface as mamba_1_style
     from causal_conv1d import causal_conv1d_fn, causal_conv1d_update
 
@@ -35,21 +34,20 @@ except Exception as e:
 
 # 1. CONFIGURATION
 config = JambaConfig(
-    vocab_size=4096,
-    hidden_size=256,
-    num_hidden_layers=8,
-    num_attention_heads=8,
-    num_key_value_heads=2,
-    intermediate_size=1024,
-    attn_layer_period=4,
-    attn_layer_offset=0,
-    num_experts=8,
-    num_experts_per_tok=2,
-    expert_retrieval_size=256,
-    max_position_embeddings=10240,
-
-    use_mamba_kernels=True,
-    use_cache=False
+    vocab_size=cfg.vocab_size,
+    hidden_size=cfg.hidden_size,
+    num_hidden_layers=cfg.num_hidden_layers,
+    num_attention_heads=cfg.num_attention_heads,
+    num_key_value_heads=cfg.num_key_value_heads,
+    intermediate_size=cfg.intermediate_size,
+    attn_layer_period=cfg.attn_layer_period,
+    attn_layer_offset=cfg.attn_layer_offset,
+    num_experts=cfg.num_experts,
+    num_experts_per_tok=cfg.num_experts_per_tok,
+    expert_retrieval_size=cfg.expert_retrieval_size,
+    max_position_embeddings=cfg.max_context,
+    use_mamba_kernels=cfg.use_mamba_kernels,
+    use_cache=cfg.use_cache
 )
 
 # 2. MODEL INITIALIZATION
@@ -58,33 +56,27 @@ model = JambaForCausalLM(config).to(dtype=torch.bfloat16, device="cuda")
 
 # 3. TRAINING ARGUMENTS
 training_args = TrainingArguments(
-    output_dir="./jamba-cipher-results",
-
-    per_device_train_batch_size=2,
-    gradient_accumulation_steps=8,
-    gradient_checkpointing=True,
-    num_train_epochs=3,
-    learning_rate=3e-4,
-    logging_steps=50,
+    output_dir=str(cfg.output_dir),
+    per_device_train_batch_size=cfg.batch_size,
+    gradient_accumulation_steps=cfg.grad_accum,
+    gradient_checkpointing=cfg.grad_checkpoint,
+    num_train_epochs=cfg.epochs,
+    learning_rate=cfg.learning_rate,
+    logging_steps=cfg.logging_steps,
     eval_strategy="steps",
-    eval_steps=1000,
+    eval_steps=cfg.eval_steps,
     save_strategy="steps",
-    save_steps=1000,
-    bf16=True,
+    save_steps=cfg.save_steps,
+    bf16=cfg.bf16,
     push_to_hub=False,
     report_to="none",
-    dataloader_num_workers=4
+    dataloader_num_workers=cfg.dataloader_num_workers
 )
 
 # 4. DATA PREP
-data_dir = Path(__file__).parent.parent.parent / "Ciphers"
-train_data_dir = data_dir / "Training"
-valid_data_dir = data_dir / "Validation"
-
 print("Initializing Datasets...")
-MAX_SEQ_LEN = 10240
-train_ds = prepare_data(train_data_dir, max_len=MAX_SEQ_LEN)
-eval_ds = prepare_data(valid_data_dir, max_len=MAX_SEQ_LEN)
+train_ds = prepare_data(cfg.training_dir)
+eval_ds = prepare_data(cfg.validation_dir)
 
 # 5. TRAINER
 trainer = Trainer(
@@ -96,7 +88,7 @@ trainer = Trainer(
 
 # 6. FIND CHECKPOINT
 print("Preparing checkpoint for Fast Path compatibility...")
-prepare_checkpoint_for_fast_path(training_args.output_dir)
+prepare_checkpoint_for_fast_path(str(cfg.output_dir))
 
 print("Starting Training...")
 trainer.train(resume_from_checkpoint=True)

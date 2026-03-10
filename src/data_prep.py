@@ -2,22 +2,23 @@ import json
 import torch
 from torch.utils.data import Dataset
 from pathlib import Path
+from config import cfg
 
 class HomophonicCipherDataset(Dataset):
-    def __init__(self, file_paths, max_len=10240):
+    def __init__(self, file_paths):
         self.file_paths = file_paths
-        self.max_len = max_len
+        self.max_len = cfg.max_context
 
         # --- VOCABULARY MAPPING ---
         # Homophones: 0 to 3000
         # Plaintext (a-z): 3001 to 3026
         self.char_to_id = {chr(i + 97): i + 3001 for i in range(26)}
 
-        # Special Tokens
-        self.PAD_ID = 3027
-        self.BOS_ID = 3028
-        self.EOS_ID = 3029
-        self.SEP_ID = 3030
+        # Special Tokens pulled from Config
+        self.PAD_ID = cfg.pad_token_id
+        self.BOS_ID = cfg.bos_token_id
+        self.EOS_ID = cfg.eos_token_id
+        self.SEP_ID = cfg.sep_token_id
 
     def __len__(self):
         return len(self.file_paths)
@@ -42,7 +43,7 @@ class HomophonicCipherDataset(Dataset):
         # Construct Sequence: <BOS> CIPHER <SEP> PLAIN <EOS>
         full_seq = [self.BOS_ID] + cipher_ids + [self.SEP_ID] + plain_ids + [self.EOS_ID]
 
-        # Labels: -100 for the cipher part (we only want to calculate loss on the plaintext prediction)
+        # Labels: -100 for the cipher part 
         cipher_part_len = len(cipher_ids) + 2
         labels = ([-100] * cipher_part_len) + plain_ids + [self.EOS_ID]
 
@@ -65,14 +66,14 @@ class HomophonicCipherDataset(Dataset):
             "labels": torch.tensor(labels, dtype=torch.long)
         }
 
-def prepare_data(folder_path, max_len=10240):
+def prepare_data(folder_path):
     path = Path(folder_path)
 
-    # Locate all json files (handles uppercase/lowercase extensions)
+    # Locate all json files
     files = list(path.rglob("*.json")) + list(path.rglob("*.JSON"))
 
     if len(files) == 0:
         raise ValueError(f"No .json files found in {path.resolve()}. Check your folder structure!")
 
     print(f"Successfully loaded {len(files)} files from {path.name}")
-    return HomophonicCipherDataset(files, max_len=max_len)
+    return HomophonicCipherDataset(files)
