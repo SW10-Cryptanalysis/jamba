@@ -1,79 +1,77 @@
-import json
 import torch
+import os
+from datasets import load_from_disk
 from torch.utils.data import Dataset
-from pathlib import Path
 from config import cfg
 
-class HomophonicCipherDataset(Dataset):
-    def __init__(self, file_paths):
-        self.file_paths = file_paths
-        self.max_len = cfg.max_context
-
-        # --- VOCABULARY MAPPING ---
-        # Homophones: 0 to 3000
-        # Plaintext (a-z): 3001 to 3026
-        self.char_to_id = {chr(i + 97): i + 3001 for i in range(26)}
-
-        # Special Tokens pulled from Config
-        self.PAD_ID = cfg.pad_token_id
-        self.BOS_ID = cfg.bos_token_id
-        self.EOS_ID = cfg.eos_token_id
-        self.SEP_ID = cfg.sep_token_id
+class PretokenizedCipherDataset(Dataset):
+    def __init__(self, directory_path):
+        # We load the existing HF dataset from disk
+        self.hf_dataset = load_from_disk(str(directory_path))
+        if len(self.hf_dataset) == 0 and int(os.environ.get("LOCAL_RANK", 0)) == 0:
+            print(f"Warning: Dataset at {directory_path} is empty.")
 
     def __len__(self):
-        return len(self.file_paths)
+        return len(self.hf_dataset)
 
     def __getitem__(self, idx):
-        # Read JSON
-        with open(self.file_paths[idx], 'r') as f:
-            data = json.load(f)
+        item = self.hf_dataset[idx]
 
-        # Process Ciphertext
-        cipher_ids = data['ciphertext']
-        if isinstance(cipher_ids, str):
-            cipher_ids = [int(x) for x in cipher_ids.split()]
+        # Pull raw lists from the arrow-backed dataset
+        input_ids = item["input_ids"][:cfg.max_context]
 
-        # Safety clip: ensure no cipher ID exceeds 3000
-        cipher_ids = [min(c, 3000) for c in cipher_ids]
+        # If your arrow file already has pre-masked labels, use them.
+        # Otherwise, we create them here.
+        if "labels" in item:
+            labels = item["labels"][:cfg.max_context]
+        else:
+            labels = list(input_ids) # Convert to list for mutation
 
-        # Process Plaintext
-        plain_text = data['plaintext'].lower()
-        plain_ids = [self.char_to_id[c] for c in plain_text if c in self.char_to_id]
+        # Ensure labels are tensors for masking logic
+        input_ids_t = torch.tensor(input_ids, dtype=torch.long)
+        labels_t = torch.tensor(labels, dtype=torch.long)
 
-        # Construct Sequence: <BOS> CIPHER <SEP> PLAIN <EOS>
-        full_seq = [self.BOS_ID] + cipher_ids + [self.SEP_ID] + plain_ids + [self.EOS_ID]
+        # Apply specific masking for Jamba:
+        # 1. Mask everything up to (and including) SEP
+        sep_indices = (input_ids_t == cfg.sep_token_id).nonzero(as_tuple=True)[0]
+        if len(sep_indices) > 0:
+            labels_t[:sep_indices[0] + 1] = -100
 
-        # Labels: -100 for the cipher part 
-        cipher_part_len = len(cipher_ids) + 2
-        labels = ([-100] * cipher_part_len) + plain_ids + [self.EOS_ID]
-
-        # Truncation
-        input_ids = full_seq[:self.max_len]
-        labels = labels[:self.max_len]
-
-        # Padding & Attention Mask
-        padding_len = self.max_len - len(input_ids)
-        attention_mask = [1] * len(input_ids)
-
-        if padding_len > 0:
-            input_ids += [self.PAD_ID] * padding_len
-            labels += [-100] * padding_len
-            attention_mask += [0] * padding_len
+        # 2. Mask special tokens (BOS, EOS, SPACE) so they don't contribute to loss
+        # Note: PAD is handled by the collator
+        filler_tokens = [cfg.bos_token_id, cfg.eos_token_id, cfg.space_token_id]
+        for t_id in filler_tokens:
+            labels_t[input_ids_t == t_id] = -100
 
         return {
-            "input_ids": torch.tensor(input_ids, dtype=torch.long),
-            "attention_mask": torch.tensor(attention_mask, dtype=torch.long),
-            "labels": torch.tensor(labels, dtype=torch.long)
+            "input_ids": input_ids_t,
+            "labels": labels_t
         }
 
-def prepare_data(folder_path):
-    path = Path(folder_path)
+def safe_pad_collate(batch):
+    """
+    Dynamic padding for the batch. This is much faster than static padding.
+    """
+    input_ids = [item["input_ids"] for item in batch]
+    labels = [item["labels"] for item in batch]
 
-    # Locate all json files
-    files = list(path.rglob("*.json")) + list(path.rglob("*.JSON"))
+    input_ids_padded = torch.nn.utils.rnn.pad_sequence(
+        input_ids, batch_first=True, padding_value=cfg.pad_token_id
+    )
 
-    if len(files) == 0:
-        raise ValueError(f"No .json files found in {path.resolve()}. Check your folder structure!")
+    labels_padded = torch.nn.utils.rnn.pad_sequence(
+        labels, batch_first=True, padding_value=-100
+    )
 
-    print(f"Successfully loaded {len(files)} files from {path.name}")
-    return HomophonicCipherDataset(files)
+    # Jamba needs an attention mask to ignore the PAD tokens
+    attention_mask = (input_ids_padded != cfg.pad_token_id).long()
+
+    return {
+        "input_ids": input_ids_padded,
+        "attention_mask": attention_mask,
+        "labels": labels_padded
+    }
+
+def prepare_data(directory_path):
+    """Wrapper to match your train.py call signature"""
+    return PretokenizedCipherDataset(directory_path)
