@@ -2,9 +2,9 @@ from dataclasses import dataclass
 from pathlib import Path
 
 # Context sizing based on your original 10240 limit
-TEXT_LEN = 5120  
+TEXT_LEN = 5120
 TOTAL_SEQ = TEXT_LEN * 2
-BUFFER = 0 
+BUFFER = 0
 
 # Paths
 BASE_DIR = Path(__file__).parent.parent.parent
@@ -16,21 +16,57 @@ VALIDATION_DIR = DATA_DIR / "Validation"
 
 @dataclass
 class Config:
-    # ARCHITECTURE
-    vocab_size: int = 4096 
-    max_context: int = TOTAL_SEQ + BUFFER # 10240
-    
-    # Token IDs (Mapped to your original dataset structure)
+    """Configuration class for Jamba Cipher Training and Evaluation.
+
+    Attributes:
+        vocab_size (int): Size of the vocabulary.
+        max_context (int): Maximum context length.
+        pad_token_id (int): ID of the padding token.
+        bos_token_id (int): ID of the beginning-of-sequence token.
+        eos_token_id (int): ID of the end-of-sequence token.
+        sep_token_id (int): ID of the separator token.
+        hidden_size (int): Hidden size of the model.
+        num_hidden_layers (int): Number of hidden layers in the model.
+        num_attention_heads (int): Number of attention heads.
+        num_key_value_heads (int): Number of key-value heads in attention.
+        intermediate_size (int): Size of the intermediate layer in the feedforward
+            network.
+        attn_layer_period (int): Periodicity of attention layers.
+        attn_layer_offset (int): Offset for attention layer placement.
+        num_experts (int): Total number of experts in MoE layers.
+        num_experts_per_tok (int): Number of experts to retrieve per token.
+        expert_retrieval_size (int): Size of the retrieval vector for experts.
+        use_mamba_kernels (bool): Whether to use Mamba kernels.
+        use_cache (bool): Whether to use caching in the model.
+        batch_size (int): Batch size for training and evaluation.
+        grad_accum (int): Number of gradient accumulation steps.
+        learning_rate (float): Learning rate for the optimizer.
+        epochs (int): Number of training epochs.
+        grad_checkpoint (bool): Whether to use gradient checkpointing.
+        bf16 (bool): Whether to use bfloat16 precision.
+        dataloader_num_workers (int): Number of workers for data loading.
+        logging_steps (int): Steps interval for logging training progress.
+        save_steps (int): Steps interval for saving model checkpoints.
+        eval_steps (int): Steps interval for running evaluation.
+        output_dir (Path): Directory to save model checkpoints and logs.
+        training_dir (Path): Directory containing the training dataset.
+        validation_dir (Path): Directory containing the validation dataset.
+
+    """
+
+    vocab_size: int = 4096
+    max_context: int = TOTAL_SEQ + BUFFER
+
     pad_token_id: int = 3027
     bos_token_id: int = 3028
     eos_token_id: int = 3029
     sep_token_id: int = 3030
-    
+
     # Jamba Specific Hyperparameters
     hidden_size: int = 256
     num_hidden_layers: int = 8
     num_attention_heads: int = 8
-    num_key_value_heads: int = 2  
+    num_key_value_heads: int = 2
     intermediate_size: int = 1024
     attn_layer_period: int = 4
     attn_layer_offset: int = 0
@@ -39,23 +75,20 @@ class Config:
     expert_retrieval_size: int = 256
     use_mamba_kernels: bool = True
     use_cache: bool = False
-    
-    # TRAINING
-    batch_size: int = 2 
+
+    batch_size: int = 2
     grad_accum: int = 8
     learning_rate: float = 3e-4
     epochs: int = 3
-    
+
     grad_checkpoint: bool = True
     bf16: bool = True
     dataloader_num_workers: int = 4
-    
-    # STEPS
+
     logging_steps: int = 50
     save_steps: int = 1000
     eval_steps: int = 1000
 
-    # SYSTEM
     output_dir: Path = OUTPUT_DIR
     training_dir: Path = TRAINING_DIR
     validation_dir: Path = VALIDATION_DIR

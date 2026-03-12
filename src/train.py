@@ -6,6 +6,8 @@ from transformers.trainer_utils import get_last_checkpoint
 from config import cfg
 from data_prep import prepare_data, safe_pad_collate
 from jamba_utils import prepare_checkpoint_for_fast_path
+from utils.logging import get_logger
+logger = get_logger(__name__, level=20)
 
 # Mamba kernel injection
 try:
@@ -15,7 +17,8 @@ try:
     try:
         from mamba_ssm.ops.triton.selective_state_update import selective_state_update
     except ImportError:
-        from mamba_ssm.ops.triton.ssd_combined import mamba_split_conv_open_loop_scan_combined as selective_state_update
+        from mamba_ssm.ops.triton.ssd_combined import (
+            mamba_split_conv_open_loop_scan_combined as selective_state_update)
 
     import transformers.models.jamba.modeling_jamba as jamba_mod
 
@@ -26,9 +29,9 @@ try:
     jamba_mod.causal_conv1d_update = causal_conv1d_update
 
     jamba_mod.is_fast_path_available = True
-    print("🚀 MAMBA 2.3.0 DETECTED: Successfully bridged kernels for Jamba.")
+    logger.info("MAMBA 2.3.0 DETECTED: Successfully bridged kernels for Jamba.")
 except Exception as e:
-    print(f"⚠️ Kernel Bridge failed: {e}")
+    logger.error(f"Kernel Bridge failed: {e}")
 
 # 1. ARCHITECTURE & MODEL
 
@@ -46,10 +49,10 @@ config = JambaConfig(
     expert_retrieval_size=cfg.expert_retrieval_size,
     max_position_embeddings=cfg.max_context,
     use_mamba_kernels=cfg.use_mamba_kernels,
-    use_cache=cfg.use_cache
+    use_cache=cfg.use_cache,
 )
 
-print("Initializing Model...")
+logger.info("Initializing Model...")
 model = JambaForCausalLM(config).to(dtype=torch.bfloat16)
 
 # 2. TRAINING SETUP
@@ -70,7 +73,7 @@ training_args = TrainingArguments(
     push_to_hub=False,
     report_to="none",
     dataloader_num_workers=cfg.dataloader_num_workers,
-    ddp_find_unused_parameters=False # Optimization for Jamba architecture
+    ddp_find_unused_parameters=False,
 )
 
 train_ds = prepare_data(cfg.training_dir)
@@ -89,18 +92,16 @@ trainer = Trainer(
 last_checkpoint = get_last_checkpoint(str(cfg.output_dir))
 
 if last_checkpoint is not None:
-    print(f"✅ Found checkpoint: {last_checkpoint}. Resuming...")
-    # Essential for ensuring the resumed model uses optimized kernels
+    logger.info(f"✅ Found checkpoint: {last_checkpoint}. Resuming...")
     prepare_checkpoint_for_fast_path(str(cfg.output_dir))
 else:
-    print("🆕 No checkpoint found. Starting training from scratch.")
+    logger.warning("🆕 No checkpoint found. Starting training from scratch.")
 
-# Start training
 trainer.train(resume_from_checkpoint=last_checkpoint)
 
 
-# 4. FINAL SAVE (The Stop Signal for .sh script)
+# 4. FINAL SAVE
 if trainer.is_world_process_zero():
-    print("🏁 Training complete. Saving final model to stop auto-chaining.")
+    logger.info("🏁 Training complete. Saving final model to stop auto-chaining.")
     final_save_path = os.path.join(str(cfg.output_dir), "final_model")
     trainer.save_model(final_save_path)
