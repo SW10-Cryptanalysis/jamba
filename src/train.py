@@ -1,6 +1,5 @@
 import os
 import torch
-import numpy as np
 from transformers import JambaConfig, JambaForCausalLM, TrainingArguments, Trainer
 from transformers.trainer_utils import get_last_checkpoint
 

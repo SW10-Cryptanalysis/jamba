@@ -8,16 +8,16 @@ def fuse_jamba_experts(state_dict, num_experts=8, moe_layers=(1, 3, 5, 7)):
     new_state_dict = state_dict.copy()
     fused_count = 0
 
-    for l in moe_layers:
-        if f"model.layers.{l}.feed_forward.experts.0.gate_proj.weight" not in state_dict:
+    for layer in moe_layers:
+        if f"model.layers.{layer}.feed_forward.experts.0.gate_proj.weight" not in state_dict:
             continue
 
         gate_projs, up_projs, down_projs = [], [], []
 
         for i in range(num_experts):
-            gate_key = f"model.layers.{l}.feed_forward.experts.{i}.gate_proj.weight"
-            up_key = f"model.layers.{l}.feed_forward.experts.{i}.up_proj.weight"
-            down_key = f"model.layers.{l}.feed_forward.experts.{i}.down_proj.weight"
+            gate_key = f"model.layers.{layer}.feed_forward.experts.{i}.gate_proj.weight"
+            up_key = f"model.layers.{layer}.feed_forward.experts.{i}.up_proj.weight"
+            down_key = f"model.layers.{layer}.feed_forward.experts.{i}.down_proj.weight"
 
             gate_projs.append(state_dict[gate_key])
             up_projs.append(state_dict[up_key])
@@ -28,10 +28,10 @@ def fuse_jamba_experts(state_dict, num_experts=8, moe_layers=(1, 3, 5, 7)):
             del new_state_dict[down_key]
 
         gate_up_fused = torch.stack([torch.cat([g, u], dim=0) for g, u in zip(gate_projs, up_projs)])
-        new_state_dict[f"model.layers.{l}.feed_forward.experts.gate_up_proj"] = gate_up_fused
+        new_state_dict[f"model.layers.{layer}.feed_forward.experts.gate_up_proj"] = gate_up_fused
 
         down_fused = torch.stack(down_projs)
-        new_state_dict[f"model.layers.{l}.feed_forward.experts.down_proj"] = down_fused
+        new_state_dict[f"model.layers.{layer}.feed_forward.experts.down_proj"] = down_fused
 
         fused_count += 1
 

@@ -1,5 +1,4 @@
 import torch
-import numpy as np
 from torch.utils.data import DataLoader
 from transformers import JambaForCausalLM
 from tqdm import tqdm
