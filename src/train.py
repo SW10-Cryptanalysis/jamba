@@ -1,5 +1,6 @@
 import os
 import torch
+import transformers
 from transformers import JambaConfig, JambaForCausalLM, TrainingArguments, Trainer
 from transformers.trainer_utils import get_last_checkpoint
 
@@ -10,7 +11,7 @@ from utils.logging import get_logger
 logger = get_logger(__name__, level=20)
 
 # Ensure correct transformers version for Mamba kernel patching
-assert transformers.__version__.startswith("5.2."), f"Kernel bridge requires transformers v5.2.x, found {transformers.__version__}"
+if not transformers.__version__.startswith("5.2."): raise RuntimeError(f"Requires v5.2.x, found {transformers.__version__}")
 
 # Mamba kernel injection
 try:
