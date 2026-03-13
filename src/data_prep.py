@@ -51,10 +51,7 @@ class PretokenizedCipherDataset(Dataset):
 
         input_ids = item["input_ids"][:cfg.max_context]
 
-        if "labels" in item:
-            labels = item["labels"][:cfg.max_context]
-        else:
-            labels = list(input_ids)
+        labels = item["labels"][:cfg.max_context] if "labels" in item else list(input_ids)
 
         # Ensure labels are tensors for masking logic
         input_ids_t = torch.tensor(input_ids, dtype=torch.long)
@@ -63,8 +60,16 @@ class PretokenizedCipherDataset(Dataset):
         # Apply specific masking for Jamba:
         # 1. Mask everything up to (and including) SEP
         sep_indices = (input_ids_t == cfg.sep_token_id).nonzero(as_tuple=True)[0]
+
         if len(sep_indices) > 0:
             labels_t[:sep_indices[0] + 1] = -100
+        else:
+            # Log first 10 samples and check local rank to avoid spamming logs
+            if idx < 10 and int(os.environ.get("LOCAL_RANK", 0)) == 0:
+                logger.warning(
+                    f"Sample {idx}: No separator token (ID: {cfg.sep_token_id}) found. "
+                    f"No prefix masking applied to labels.",
+                )
 
         # 2. Mask special tokens (BOS, EOS, SPACE) so they don't contribute to loss
         # Note: PAD is handled by the collator

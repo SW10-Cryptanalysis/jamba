@@ -9,6 +9,9 @@ from jamba_utils import prepare_checkpoint_for_fast_path
 from utils.logging import get_logger
 logger = get_logger(__name__, level=20)
 
+# Ensure correct transformers version for Mamba kernel patching
+assert transformers.__version__.startswith("5.2."), f"Kernel bridge requires transformers v5.2.x, found {transformers.__version__}"
+
 # Mamba kernel injection
 try:
     import mamba_ssm.ops.selective_scan_interface as mamba_1_style

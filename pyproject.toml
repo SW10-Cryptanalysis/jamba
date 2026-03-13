@@ -21,11 +21,11 @@ dependencies = [
 ]
 
 [tool.uv.sources]
-mamba-ssm = { git = "https://github.com/state-spaces/mamba.git", branch = "main" }
-causal-conv1d = { git = "https://github.com/Dao-AILab/causal-conv1d.git", branch = "main" }
+mamba-ssm = { git = "https://github.com/state-spaces/mamba.git", rev = "f1493ff" } 
+causal-conv1d = { git = "https://github.com/Dao-AILab/causal-conv1d.git", rev = "da6dbaa" }
 
 [tool.ruff]
-line-length = 88
+line-length = 140
 
 [tool.ruff.lint]
 exclude = ["venv", ".venv", "__pycache__", "build", "dist", ".eggs", "*.egg", ".mypy_cache", ".pytest_cache"]
