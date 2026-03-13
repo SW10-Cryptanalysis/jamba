@@ -25,7 +25,7 @@ def run_evaluation() -> None:
 	)
 	model.eval()
 
-	logger.debug(f"Loading validation data from {cfg.validation_dir}...")
+	logger.debug(f"Loading validation data from {cfg.test_dir}...")
 	val_ds = prepare_data(cfg.test_dir)
 	val_loader = DataLoader(
 		val_ds,

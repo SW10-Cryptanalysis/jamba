@@ -11,8 +11,8 @@ BASE_DIR = Path(__file__).parent.parent.parent
 DATA_DIR = BASE_DIR / "Ciphers"
 OUTPUT_DIR = Path(__file__).parent.parent / "jamba-cipher-results"
 
-TRAINING_DIR = DATA_DIR / "Training"
-VALIDATION_DIR = DATA_DIR / "Validation"
+TRAINING_DIR = DATA_DIR / "tokenized_normal" / "Training"
+VALIDATION_DIR = DATA_DIR / "tokenized_normal" / "Validation"
 
 @dataclass
 class Config:
