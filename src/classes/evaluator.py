@@ -4,8 +4,7 @@ from torch.utils.data import DataLoader
 from transformers import JambaForCausalLM
 from tqdm import tqdm
 
-from classes.config import Config
-from data_prep import CipherDataCollator, PretokenizedCipherDataset
+from classes import Config, CipherDataCollator, PretokenizedCipherDataset
 from utils.logging import get_logger
 
 logger = get_logger(__name__, level=20)
