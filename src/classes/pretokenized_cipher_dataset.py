@@ -1,0 +1,88 @@
+import torch
+from pathlib import Path
+import os
+from datasets import load_from_disk
+from torch.utils.data import Dataset
+
+from classes.config import Config
+from utils.logging import get_logger
+
+logger = get_logger(__name__, level=20)
+
+class PretokenizedCipherDataset(Dataset):
+    """A PyTorch Dataset class for loading pre-tokenized cipher data from disk.
+
+    Attributes:
+        hf_dataset (datasets.Dataset): The Hugging Face Dataset object containing the
+            pre-tokenized data.
+        config (Config): The configuration object containing token IDs and limits.
+
+    """
+
+    def __init__(self, directory_path: str | Path, config: Config) -> None:
+        """Initialize the dataset by loading pre-tokenized data from disk.
+
+        Args:
+            directory_path (str | Path): Path to the directory containing the dataset.
+            config (Config): System configuration containing token IDs and model bounds.
+
+        """
+        self.config = config
+        self.hf_dataset = load_from_disk(str(directory_path))
+
+        if len(self.hf_dataset) == 0 and int(os.environ.get("LOCAL_RANK", 0)) == 0:
+            logger.warning(f"Dataset at {directory_path} is empty.")
+
+    def __len__(self) -> int:
+        """Get length of the dataset.
+
+        Returns:
+            int: The number of samples in the dataset.
+
+        """
+        return len(self.hf_dataset)
+
+    def __getitem__(self, idx: int) -> dict[str, torch.Tensor]:
+        """Get a single item from the dataset and applies masking to the labels.
+
+        Masking Rules Applied:
+        1. Masks all tokens up to and including the SEP token to prevent loss
+           calculation on the prompt itself.
+        2. Masks special tokens (BOS, EOS, SPACE) to exclude them from the loss.
+
+        Args:
+            idx (int): Index of the sample to retrieve.
+
+        Returns:
+            dict[str, torch.Tensor]: A dictionary containing 'input_ids' and 'labels'
+                tensors, where 'labels' has been masked.
+
+        """
+        item = self.hf_dataset[idx]
+        max_len = self.config.jamba_config.max_position_embeddings
+
+        input_ids = item["input_ids"][:max_len]
+        labels = item["labels"][:max_len] if "labels" in item else list(input_ids)
+
+        input_ids_t = torch.tensor(input_ids, dtype=torch.long)
+        labels_t = torch.tensor(labels, dtype=torch.long)
+
+        sep_indices = (input_ids_t == self.config.sep_token_id).nonzero(as_tuple=True)[0]
+
+        if len(sep_indices) > 0:
+            labels_t[: sep_indices[0] + 1] = -100
+        else:
+            if idx < 10 and int(os.environ.get("LOCAL_RANK", 0)) == 0:
+                logger.warning(
+                    f"Sample {idx}: No separator token (ID: {self.config.sep_token_id}) found. No prefix masking applied to labels.",
+                )
+
+        filler_tokens = [self.config.bos_token_id, self.config.eos_token_id, self.config.space_token_id]
+
+        for t_id in filler_tokens:
+            labels_t[input_ids_t == t_id] = -100
+
+        return {
+            "input_ids": input_ids_t,
+            "labels": labels_t,
+        }
