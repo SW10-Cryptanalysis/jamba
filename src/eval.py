@@ -1,5 +1,5 @@
-from src.classes.evaluator import JambaEvaluator
-from src.classes.config import Config
+from classes.evaluator import JambaEvaluator
+from classes.config import Config
 
 
 def main() -> None:

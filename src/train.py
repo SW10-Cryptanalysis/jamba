@@ -1,5 +1,5 @@
-from src.classes.trainer import JambaTrainingPipeline
-from src.classes.config import Config
+from classes.trainer import JambaTrainingPipeline
+from classes.config import Config
 
 
 def main() -> None:

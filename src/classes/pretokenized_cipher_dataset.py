@@ -4,8 +4,8 @@ import os
 from datasets import load_from_disk
 from torch.utils.data import Dataset
 
-from src.classes.config import Config
-from src.utils.logging import get_logger
+from classes.config import Config
+from utils.logging import get_logger
 
 logger = get_logger(__name__, level=20)
 
