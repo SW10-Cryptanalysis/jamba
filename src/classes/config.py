@@ -145,19 +145,13 @@ class Config:
     def load_homophones(self, homophone_file: str = "metadata.json") -> None:
         """Load the homophone metadata file and set the unique homophone count."""
         homophone_path = self.data_dir / homophone_file
-        if homophone_path.exists():
-            try:
-                with open(homophone_path) as f:
-                    meta = json.load(f)
-                    self.unique_homophones = int(meta["max_symbol_id"])
-            except OSError as e:
-                logger.warning(f"Could not read file: {homophone_file} ({homophone_path})")
-                logger.warning(f"Using default value: {self.unique_homophones}")
-                logger.warning(f"Error: {e}")
-            except (ValueError, KeyError) as e:
-                logger.warning(f"Invalid or missing data in {homophone_file} ({homophone_path})")
-                logger.warning(f"Using default value: {self.unique_homophones}")
-                logger.warning(f"Error: {e}")
+        try:
+            with open(homophone_path) as f:
+                meta = json.load(f)
+                self.unique_homophones = int(meta["max_symbol_id"])
+        except (OSError, ValueError, KeyError) as e:
+            logger.error(f"Critical failure loading {homophone_path}. Metadata is required for vocab sizing.")
+            raise RuntimeError("Aborting initialization: Invalid or missing homophone metadata.") from e
 
         self.jamba_config.vocab_size = self.char_offset + self.unique_letters + 1
 
