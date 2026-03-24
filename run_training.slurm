@@ -9,8 +9,8 @@
 #SBATCH --gres=gpu:l4:4
 
 set -x
-set -e
-set -o pipefail
+#set -e
+#set -o pipefail
 
 # --- 1. DEFINE PATHS ---
 PROJECT_DIR="/ceph/project/SW10-CausalLM/jamba"
@@ -41,12 +41,13 @@ export OMP_NUM_THREADS=8
 MASTER_PORT=$((10000 + $RANDOM % 20000))
 
 # --- 4. RUN TRAINING INSIDE SINGULARITY ---
-# --- 4. RUN TRAINING INSIDE SINGULARITY ---
 
 singularity exec --nv \
     --pwd $PROJECT_DIR \
     -B /ceph/project/SW10-CausalLM:/ceph/project/SW10-CausalLM \
     ${CONTAINER} /bin/bash -c "
+        set-x
+
         export PYTHONPATH='$PROJECT_DIR/src'
         export PYTHONUNBUFFERED=1
         export PYTHONNOUSERSITE=1
