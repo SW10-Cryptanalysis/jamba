@@ -8,21 +8,48 @@ dependencies = [
     "accelerate>=1.12.0",
     "einops>=0.8.2",
     "datasets>=4.6.0",
-    "numpy>=2.4.2",
+    "numpy<2.0.0; sys_platform == 'darwin' and platform_machine == 'x86_64'",
+    "torch>=2.10.0; sys_platform != 'darwin' or platform_machine != 'x86_64'",
+    "torch<2.3.0; sys_platform == 'darwin' and platform_machine == 'x86_64'",
+    "causal-conv1d>=1.6.0; sys_platform == 'linux'",
+    "mamba-ssm>=2.3.0; sys_platform == 'linux'",
     "pathlib>=1.0.1",
     "safetensors>=0.7.0",
     "scikit-learn>=1.8.0",
     "sentencepiece>=0.2.1",
-    "torch>=2.10.0",
     "transformers>=5.2.0",
-    "causal-conv1d>=1.6.0",
-    "mamba-ssm>=2.3.0",
     "easy-logging-formatter>=0.1.1",
 ]
 
-[tool.uv.sources]
-mamba-ssm = { git = "https://github.com/state-spaces/mamba.git", rev = "f1493ff" } 
-causal-conv1d = { git = "https://github.com/Dao-AILab/causal-conv1d.git", rev = "da6dbaa" }
+[dependency-groups]
+dev = [
+    "pytest>=8.4.2",
+    "pytest-cov>=7.0.0",
+    "pytest-mock>=3.15.1",
+    "ruff>=0.13.1",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["test"]
+addopts = "-v --tb=short --cov=src --cov-report=term-missing"
+markers = [
+	"integration: marks tests as integration tests (deselect with '-m \"not integration\"')",
+]
+
+[tool.coverage.run]
+omit = [
+    "src/eval.py",
+    "src/train.py",
+]
+
+[tool.coverage.report]
+exclude_also = [
+	"if 0:",
+    "if __name__ == .__main__.:",
+	"import",
+	"from",
+]
 
 [tool.ruff]
 line-length = 140
@@ -52,4 +79,4 @@ ignore = [
     "S106",   # Possible hardcoded password
 ]
 [tool.ruff.format]
-indent-style = "tab"
+indent-style = "space"
