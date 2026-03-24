@@ -212,3 +212,5 @@ outputs/
 
 .direnv/
 .envrc
+jamba_container/
+jamba-cipher-results/
