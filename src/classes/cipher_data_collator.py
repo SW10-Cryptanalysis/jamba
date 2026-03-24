@@ -1,6 +1,6 @@
 import torch
 
-from classes.config import Config
+from src.classes.config import Config
 
 
 class CipherDataCollator:
