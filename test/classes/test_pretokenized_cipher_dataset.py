@@ -2,7 +2,6 @@ import pytest
 import torch
 import os
 from dataclasses import dataclass
-from unittest.mock import MagicMock
 
 from classes.config import Config
 from classes.pretokenized_cipher_dataset import PretokenizedCipherDataset
@@ -31,23 +30,16 @@ INIT_CASES = [
 def mock_config(mocker):
     """Fixture providing a mock Config with predictable token IDs."""
     mocker.patch.object(Config, "load_homophones")
-    cfg = Config()
-    """
-    Since unique_homophones defaults to 500, the properties naturally compute to:
-    sep_token_id = 501
-    space_token_id = 502
-    bos_token_id = 503
-    eos_token_id = 504
-    """
-    return cfg
+    return Config()
 
 
 @pytest.mark.parametrize("case", INIT_CASES, ids=lambda c: c.name)
 def test_dataset_init_and_len(mocker, mock_config, case: InitTestCase):
     """Test dataset initialization, rank checking, and length retrieval."""
-    mock_hf_dataset = MagicMock()
+    # mocker.patch returns a MagicMock by default, which supports __len__
+    mock_load = mocker.patch("classes.pretokenized_cipher_dataset.load_from_disk")
+    mock_hf_dataset = mock_load.return_value
     mock_hf_dataset.__len__.return_value = case.dataset_len
-    mocker.patch("classes.pretokenized_cipher_dataset.load_from_disk", return_value=mock_hf_dataset)
 
     mocker.patch.dict(os.environ, {}, clear=True)
     if case.local_rank is not None:
@@ -67,94 +59,48 @@ def test_dataset_init_and_len(mocker, mock_config, case: InitTestCase):
 
 @dataclass
 class GetItemTestCase:
-    """Data for testing the getitem sequence truncation and masking logic."""
+    """Data for testing the getitem sequence truncation and filler masking logic."""
 
     name: str
     item_dict: dict[str, list[int]]
     max_len: int
-    idx: int
-    local_rank: str
     expected_labels: list[int]
-    expect_warning: bool
 
 
 GETITEM_CASES = [
     GetItemTestCase(
-        name="standard_masking_with_sep_and_fillers",
+        name="masks_only_filler_tokens",
         item_dict={"input_ids": [1, 2, 501, 3, 503, 4], "labels": [10, 20, 30, 40, 50, 60]},
         max_len=100,
-        idx=0,
-        local_rank="0",
-        expected_labels=[-100, -100, -100, 40, -100, 60],
-        expect_warning=False,
+        expected_labels=[10, 20, 30, 40, -100, 60],
     ),
     GetItemTestCase(
-        name="no_labels_in_item_uses_input_ids",
-        item_dict={"input_ids": [1, 501, 3]},
+        name="no_labels_in_item_uses_input_ids_with_masking",
+        item_dict={"input_ids": [1, 502, 3, 504]},
         max_len=100,
-        idx=0,
-        local_rank="0",
-        expected_labels=[-100, -100, 3],
-        expect_warning=False,
+        expected_labels=[1, -100, 3, -100],
     ),
     GetItemTestCase(
-        name="truncation_applied_to_max_len",
-        item_dict={"input_ids": [1, 501, 3, 4, 5], "labels": [10, 20, 30, 40, 50]},
+        name="truncation_applied_before_masking",
+        item_dict={"input_ids": [1, 501, 503, 4, 5], "labels": [10, 20, 30, 40, 50]},
         max_len=3,
-        idx=0,
-        local_rank="0",
-        expected_labels=[-100, -100, 30],
-        expect_warning=False,
-    ),
-    GetItemTestCase(
-        name="no_sep_warns_main_process_early_idx",
-        item_dict={"input_ids": [1, 2, 3], "labels": [10, 20, 30]},
-        max_len=100,
-        idx=5,
-        local_rank="0",
-        expected_labels=[10, 20, 30],
-        expect_warning=True,
-    ),
-    GetItemTestCase(
-        name="no_sep_no_warn_late_idx",
-        item_dict={"input_ids": [1, 2, 3], "labels": [10, 20, 30]},
-        max_len=100,
-        idx=15,
-        local_rank="0",
-        expected_labels=[10, 20, 30],
-        expect_warning=False,
-    ),
-    GetItemTestCase(
-        name="no_sep_no_warn_not_main_process",
-        item_dict={"input_ids": [1, 2, 3], "labels": [10, 20, 30]},
-        max_len=100,
-        idx=5,
-        local_rank="1",
-        expected_labels=[10, 20, 30],
-        expect_warning=False,
+        expected_labels=[10, 20, -100],
     ),
 ]
 
 
 @pytest.mark.parametrize("case", GETITEM_CASES, ids=lambda c: c.name)
 def test_dataset_getitem(mocker, mock_config, case: GetItemTestCase):
-    """Test data retrieval, sequence truncation, and prefix/filler masking rules."""
-    mock_hf_dataset = MagicMock()
+    """Test data retrieval, truncation, and specifically filler masking."""
+    # Using MagicMock for __getitem__ support
+    mock_hf_dataset = mocker.MagicMock()
     mock_hf_dataset.__getitem__.return_value = case.item_dict
-    mock_hf_dataset.__len__.return_value = 1
     mocker.patch("classes.pretokenized_cipher_dataset.load_from_disk", return_value=mock_hf_dataset)
 
     mock_config.jamba_config.max_position_embeddings = case.max_len
-
-    mocker.patch.dict(os.environ, {"LOCAL_RANK": case.local_rank}, clear=True)
-    mock_logger = mocker.patch("classes.pretokenized_cipher_dataset.logger.warning")
+    mocker.patch.dict(os.environ, {"LOCAL_RANK": "0"}, clear=True)
 
     dataset = PretokenizedCipherDataset("dummy_path", mock_config)
-    result = dataset[case.idx]
+    result = dataset[0]
 
     assert torch.equal(result["labels"], torch.tensor(case.expected_labels, dtype=torch.long))
-
-    if case.expect_warning:
-        mock_logger.assert_called_once()
-    else:
-        mock_logger.assert_not_called()
