@@ -28,9 +28,15 @@ jobs:
 
       - name: Install dependencies
         run: >
-            uv sync
+            uv sync --no-dev --group test 
             --no-install-package mamba-ssm 
             --no-install-package causal-conv1d
+            --no-install-package nvidia-cudnn-cu12
+            --no-install-package nvidia-cublas-cu12
+            --no-install-package nvidia-cusparse-cu12
+            --no-install-package nvidia-cusolver-cu12
+            --no-install-package nvidia-cufft-cu12
+            --no-install-package nvidia-nccl-cu12
 
       - name: Run Pytest
         run: uv run --no-sync pytest -m "not integration"
