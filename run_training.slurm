@@ -41,17 +41,20 @@ export OMP_NUM_THREADS=8
 MASTER_PORT=$((10000 + $RANDOM % 20000))
 
 # --- 4. RUN TRAINING INSIDE SINGULARITY ---
+# --- 4. RUN TRAINING INSIDE SINGULARITY ---
+
 singularity exec --nv \
     --pwd $PROJECT_DIR \
     -B /ceph/project/SW10-CausalLM:/ceph/project/SW10-CausalLM \
     ${CONTAINER} /bin/bash -c "
-        export PYTHONPATH='$PROJECT_DIR:$PROJECT_DIR/src'
+        export PYTHONPATH='$PROJECT_DIR/src'
         export PYTHONUNBUFFERED=1
         export PYTHONNOUSERSITE=1
+        
         source ${VENV_DIR}/bin/activate
 
         # Using torchrun to properly leverage all 4 allocated L4 GPUs
         torchrun --nproc_per_node=4 --master_port=$MASTER_PORT src/train.py
-    " 2>&1 | tee -a logs/train_live_${SLURM_JOB_ID}.log
+    "
 
 echo "Job finished at $(date)"
