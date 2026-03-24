@@ -8,7 +8,9 @@
 #SBATCH --mem=64G
 #SBATCH --gres=gpu:l4:4
 
+set -x
 set -e
+set -o pipefail
 
 # --- 1. DEFINE PATHS ---
 PROJECT_DIR="/ceph/project/SW10-CausalLM/jamba"
