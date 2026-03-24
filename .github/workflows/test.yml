@@ -28,7 +28,7 @@ jobs:
 
       - name: Install dependencies
         run: >
-            uv sync --no-dev --group test 
+            uv sync
             --no-install-package mamba-ssm 
             --no-install-package causal-conv1d
             --no-install-package nvidia-cudnn-cu12
