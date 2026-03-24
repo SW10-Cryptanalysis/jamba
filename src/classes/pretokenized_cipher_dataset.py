@@ -9,6 +9,7 @@ from utils.logging import get_logger
 
 logger = get_logger(__name__, level=20)
 
+
 class PretokenizedCipherDataset(Dataset):
     """A PyTorch Dataset class for loading pre-tokenized cipher data from disk.
 
@@ -30,8 +31,18 @@ class PretokenizedCipherDataset(Dataset):
         self.config = config
         self.hf_dataset = load_from_disk(str(directory_path))
 
-        if len(self.hf_dataset) == 0 and int(os.environ.get("LOCAL_RANK", 0)) == 0:
+        if len(self.hf_dataset) == 0 and self._is_main_process():
             logger.warning(f"Dataset at {directory_path} is empty.")
+
+    def _is_main_process(self) -> bool:
+        """Check if the current process is the main process.
+
+        Returns:
+            bool: True if the current process is the main process, False otherwise.
+
+        """
+        rank = os.environ.get("LOCAL_RANK", "0")
+        return rank.isdigit() and int(rank) == 0
 
     def __len__(self) -> int:
         """Get length of the dataset.
