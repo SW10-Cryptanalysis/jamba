@@ -54,12 +54,7 @@ class PretokenizedCipherDataset(Dataset):
         return len(self.hf_dataset)
 
     def __getitem__(self, idx: int) -> dict[str, torch.Tensor]:
-        """Get a single item from the dataset and applies masking to the labels.
-
-        Masking Rules Applied:
-        1. Masks all tokens up to and including the SEP token to prevent loss
-           calculation on the prompt itself.
-        2. Masks special tokens (BOS, EOS, SPACE) to exclude them from the loss.
+        """Get a single item from the dataset and applies masking to the special tokens.
 
         Args:
             idx (int): Index of the sample to retrieve.
@@ -77,16 +72,6 @@ class PretokenizedCipherDataset(Dataset):
 
         input_ids_t = torch.tensor(input_ids, dtype=torch.long)
         labels_t = torch.tensor(labels, dtype=torch.long)
-
-        sep_indices = (input_ids_t == self.config.sep_token_id).nonzero(as_tuple=True)[0]
-
-        if len(sep_indices) > 0:
-            labels_t[: sep_indices[0] + 1] = -100
-        else:
-            if idx < 10 and int(os.environ.get("LOCAL_RANK", 0)) == 0:
-                logger.warning(
-                    f"Sample {idx}: No separator token (ID: {self.config.sep_token_id}) found. No prefix masking applied to labels.",
-                )
 
         filler_tokens = [self.config.bos_token_id, self.config.eos_token_id, self.config.space_token_id]
 
