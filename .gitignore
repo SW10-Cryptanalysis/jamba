@@ -205,3 +205,13 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+
+logs/
+outputs/
+
+.direnv/
+.envrc
+jamba_container/
+jamba-cipher-results/
+pytorch_25.03-py3.sif
