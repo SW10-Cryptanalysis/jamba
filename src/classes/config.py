@@ -6,6 +6,7 @@ from utils.logging import get_logger
 
 logger = get_logger(__name__, level=20)
 
+TRANSFORMER_VERSION = 5.3
 TEXT_LEN = 10_000
 UNIQUE_HOMOPHONES = 500
 TOTAL_SEQ = TEXT_LEN * 2
