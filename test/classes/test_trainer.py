@@ -63,8 +63,8 @@ class VersionCheckCase:
 @pytest.mark.parametrize(
     "case",
     [
-        VersionCheckCase("valid_version", "5.2.1", False),
-        VersionCheckCase("invalid_version", "5.1.0", True),
+        VersionCheckCase("valid_version", "5.3.0", False),
+        VersionCheckCase("invalid_version", "5.2.0", True),
     ],
     ids=lambda c: c.name,
 )
@@ -72,7 +72,7 @@ def test_verify_transformers_version(mocker, mock_pipeline, case: VersionCheckCa
     mocker.patch("transformers.__version__", case.version)
 
     if case.expect_error:
-        with pytest.raises(RuntimeError, match=f"Requires v5.2.x, found {case.version}"):
+        with pytest.raises(RuntimeError, match=f"Requires v5.3.x, found {case.version}"):
             mock_pipeline._verify_transformers_version()
     else:
         mock_pipeline._verify_transformers_version()  # Should not raise

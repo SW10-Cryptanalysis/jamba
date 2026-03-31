@@ -24,8 +24,8 @@ class JambaTrainingPipeline:
 
     def _verify_transformers_version(self) -> None:
         """Verify that the transformers version is compatible with the Mamba kernel patch."""
-        if not transformers.__version__.startswith("5.2."):
-            raise RuntimeError(f"Requires v5.2.x, found {transformers.__version__}")
+        if not transformers.__version__.startswith("5.3."):
+            raise RuntimeError(f"Requires v5.3.x, found {transformers.__version__}")
 
     def _inject_mamba_kernels(self) -> None:
         """Injects Mamba 2.3.0 kernels into the transformers Jamba implementation."""
