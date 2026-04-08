@@ -55,7 +55,7 @@ singularity exec --nv \
         source ${VENV_DIR}/bin/activate
 
         # Using torchrun to properly leverage all 4 allocated L4 GPUs
-        torchrun --nproc_per_node=4 --master_port=$MASTER_PORT src/train.py
+        torchrun --nproc_per_node=4 --master_port=$MASTER_PORT src/train.py "$@"
     "
 
 echo "Job finished at $(date)"
