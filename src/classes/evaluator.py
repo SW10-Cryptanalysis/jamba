@@ -157,7 +157,7 @@ def main() -> None:
     parser.add_argument("--model_path", type=str, required=True)
     args = parser.parse_args()
 
-    evaluator = CipherEvaluator(model_path=args.model_path, use_spaces=args.spaces)
+    evaluator = CipherEvaluator(model_path=args.model_path, use_spaces=args.spaced)
     evaluator.run()
 
 
