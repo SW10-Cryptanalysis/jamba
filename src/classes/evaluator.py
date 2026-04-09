@@ -75,6 +75,14 @@ class CipherEvaluator:
     def _evaluate_single_sample(self, item: dict, index: int) -> dict | None:
         """Extract targets, runs inference, and calculates metrics for one sample."""
         all_ids = item["input_ids"]
+
+        if index == 0:
+            logger.info(f"--- DEBUG DATA INSPECTION ---")
+            logger.info(f"Config SEP ID: {self.config.sep_token_id}")
+            logger.info(f"Full Sequence IDs: {all_ids}")
+            logger.info(f"Sequence Length: {len(all_ids)}")
+            logger.info(f"--- END DEBUG ---")
+
         true_plain = item["raw_plaintext"]
         redundancy = int(item["redundancy"])
 
@@ -99,7 +107,7 @@ class CipherEvaluator:
                 min_new_tokens=target_length,
                 do_sample=False,
                 use_cache=True,
-                pad_token_id=self.config.pad_token_id,
+                pad_token_id=0,
                 eos_token_id=self.config.eos_token_id,
             )
 
