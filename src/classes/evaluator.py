@@ -9,7 +9,7 @@ from datasets import Dataset, DatasetDict, load_from_disk
 from easy_logging import EasyFormatter
 from transformers import JambaForCausalLM
 
-from src.classes.config import Config
+from classes import Config
 
 handler = logging.StreamHandler()
 handler.setFormatter(EasyFormatter())
@@ -37,9 +37,9 @@ class CipherEvaluator:
     def _load_model(self) -> JambaForCausalLM:
         """Instantiate the Jamba model onto the appropriate device."""
         logger.info(f"Loading Jamba model from {self.model_path} (Native PyTorch path)...")
-        
+
         dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
-        
+
         model = JambaForCausalLM.from_pretrained(
             self.model_path,
             torch_dtype=dtype,
