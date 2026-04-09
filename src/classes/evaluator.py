@@ -1,126 +1,165 @@
-import torch
+import argparse
+import json
+import logging
+import time
 from pathlib import Path
-from torch.utils.data import DataLoader
+
+import torch
+from datasets import Dataset, DatasetDict, load_from_disk
+from easy_logging import EasyFormatter
 from transformers import JambaForCausalLM
-from tqdm import tqdm
 
-from classes import Config, CipherDataCollator, PretokenizedCipherDataset
-from utils.logging import get_logger
+from src.classes.config import Config
 
-logger = get_logger(__name__, level=20)
+handler = logging.StreamHandler()
+handler.setFormatter(EasyFormatter())
+logger = logging.getLogger(__name__)
+logger.addHandler(handler)
+logger.setLevel(logging.INFO)
 
 
-class JambaEvaluator:
-    """Pipeline for evaluating the Jamba model on the validation dataset."""
+class CipherEvaluator:
+    """Orchestrates the evaluation of a Jamba model on cipher decoding tasks."""
 
-    def __init__(self, config: Config, model_path: Path | None = None) -> None:
-        """Initialize the evaluator with configuration and optional model path."""
-        self.cfg = config
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.model_path = model_path or (self.cfg.output_dir / "final_model")
+    def __init__(self, model_path: str, use_spaces: bool) -> None:
+        """Initialize state, sets up configuration, and loads required assets."""
+        self.model_path = model_path
+        self.config = Config()
+        self.config.use_spaces = use_spaces
+        self.config.load_homophones()
 
+        self.output_log_path = Path(self.model_path) / "evaluation_results.jsonl"
+
+        # Direct model loading without kernel patching
         self.model = self._load_model()
-        self.val_loader = self._prepare_dataloader()
+        self.dataset = self._load_dataset()
 
     def _load_model(self) -> JambaForCausalLM:
-        """Load the trained model from disk and sets it to evaluation mode."""
-        if not self.model_path.exists():
-            raise FileNotFoundError(f"Could not find model at {self.model_path}. Is training finished?")
-
-        logger.info(f"Loading model from {self.model_path}...")
+        """Instantiate the Jamba model onto the appropriate device."""
+        logger.info(f"Loading Jamba model from {self.model_path} (Native PyTorch path)...")
+        
+        dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
+        
         model = JambaForCausalLM.from_pretrained(
             self.model_path,
-            torch_dtype=torch.bfloat16,
+            torch_dtype=dtype,
             device_map="auto",
         )
+        model.config.use_cache = True
         model.eval()
         return model
 
-    def _prepare_dataloader(self) -> DataLoader:
-        """Instantiate the dataset and dataloader for evaluation."""
-        logger.debug(f"Loading validation data from {self.cfg.validation_dir}...")
-        val_ds = PretokenizedCipherDataset(self.cfg.validation_dir, self.cfg)
-        collator = CipherDataCollator(self.cfg)
+    def _load_dataset(self) -> Dataset | DatasetDict:
+        """Retrieve the pre-tokenized dataset from the configured directory."""
+        folder = "tokenized_spaced" if self.config.use_spaces else "tokenized_normal"
+        test_arrow_path = self.config.data_dir / folder / "Test"
+        return load_from_disk(test_arrow_path)
 
-        return DataLoader(
-            val_ds,
-            batch_size=self.cfg.batch_size,
-            collate_fn=collator,
-            num_workers=self.cfg.dataloader_num_workers,
-        )
+    def decode_prediction(self, ids: list[int]) -> str:
+        """Convert model token IDs back into a plaintext string based on config."""
+        chars = []
+        for idx in ids:
+            if idx == self.config.space_token_id:
+                chars.append("_" if self.config.use_spaces else " ")
+            elif idx >= self.config.char_offset:
+                chars.append(chr(idx - self.config.char_offset + ord("a")))
+            elif idx == self.config.eos_token_id:
+                break
+        return "".join(chars)
 
-    def _process_evaluation_batch(
-        self,
-        batch: dict[str, torch.Tensor],
-        extract_samples: bool = False,
-    ) -> tuple[int, int, list[dict[str, list[int]]]]:
-        """Run the forward pass and compute errors for a single batch.
+    def decode_ciphertext(self, ids: list[int]) -> str:
+        """Convert integer cipher IDs back to a space-separated string."""
+        excluded = {self.config.bos_token_id, self.config.sep_token_id}
+        return " ".join(str(idx) for idx in ids if idx not in excluded)
 
-        Args:
-            batch (dict[str, torch.Tensor]): The input batch containing input_ids and labels.
-            extract_samples (bool): Whether to extract qualitative sample predictions.
+    def _evaluate_single_sample(self, item: dict, index: int) -> dict | None:
+        """Extract targets, runs inference, and calculates metrics for one sample."""
+        all_ids = item["input_ids"]
+        true_plain = item["raw_plaintext"]
+        redundancy = int(item["redundancy"])
 
-        Returns:
-            tuple[int, int, list[dict[str, list[int]]]]: A tuple containing the number of
-                errors, the total number of valid symbols, and a list of qualitative samples.
+        try:
+            sep_idx = all_ids.index(self.config.sep_token_id)
+            input_ids = all_ids[: sep_idx + 1]
+            raw_cipher_ids = all_ids[1:sep_idx]
+        except ValueError:
+            logger.warning(f"Sample {index} missing SEP token. Skipping.")
+            return None
 
-        """
-        input_ids = batch["input_ids"].to(self.device)
-        labels = batch["labels"].to(self.device)
+        input_tensor = torch.tensor([input_ids]).to(self.model.device)
+        target_length = len(raw_cipher_ids)
 
-        outputs = self.model(input_ids=input_ids)
-        preds = torch.argmax(outputs.logits, dim=-1)
+        start_time = time.perf_counter()
 
-        mask = labels != -100
-        errors = 0
-        symbols = 0
-        samples = []
-
-        if mask.any():
-            errors = int((preds[mask] != labels[mask]).sum().item())
-            symbols = int(mask.sum().item())
-
-        if extract_samples:
-            for j in range(min(len(input_ids), 3)):
-                samples.append(
-                    {
-                        "truth": labels[j][mask[j]].tolist(),
-                        "pred": preds[j][mask[j]].tolist(),
-                    },
-                )
-
-        return errors, symbols, samples
-
-    def evaluate(self) -> float:
-        """Run evaluation loop to compute Symbol Error Rate (SER)."""
-        total_errors = 0
-        total_symbols = 0
-        sample_outputs = []
-
-        logger.info("Starting validation evaluation...")
         with torch.no_grad():
-            for i, batch in enumerate(tqdm(self.val_loader)):
-                errors, symbols, samples = self._process_evaluation_batch(
-                    batch=batch,
-                    extract_samples=(i == 0),
-                )
+            output_ids = self.model.generate(
+                input_tensor,
+                attention_mask=torch.ones_like(input_tensor),
+                max_new_tokens=target_length,
+                min_new_tokens=target_length,
+                do_sample=False,
+                use_cache=True,
+                pad_token_id=self.config.pad_token_id,
+                eos_token_id=self.config.eos_token_id,
+            )
 
-                total_errors += errors
-                total_symbols += symbols
+        generation_time = time.perf_counter() - start_time
 
-                if samples:
-                    sample_outputs.extend(samples)
+        pred_ids = output_ids[0][len(input_ids) :].tolist()
+        pred_plain = self.decode_prediction(pred_ids)
 
-        final_ser = total_errors / total_symbols if total_symbols > 0 else 0.0
+        return {
+            "index": index,
+            "redundancy": redundancy,
+            "ciphertext": self.decode_ciphertext(raw_cipher_ids),
+            "plaintext": true_plain,
+            "predicted_plaintext": pred_plain,
+            "ser": self._ser(true_plain, pred_plain),
+            "inference_time_seconds": round(generation_time, 4),
+        }
 
-        logger.info("\n" + "=" * 50)
-        logger.info(f"FINAL VALIDATION SER: {final_ser:.6f}")
-        logger.info("=" * 50 + "\n")
+    def _ser(self, true_plain: str, pred_plain: str) -> float:
+        if not true_plain:
+            return 1.0 if pred_plain else 0.0
+        mismatches = sum(t != p for t, p in zip(true_plain, pred_plain, strict=False))
+        length_diff = abs(len(true_plain) - len(pred_plain))
+        raw_ser = (mismatches + length_diff) / len(true_plain)
+        return min(raw_ser, 1.0)
 
-        logger.info("Qualitative Sample (Token IDs):")
-        for idx, sample in enumerate(sample_outputs):
-            logger.info(f"\nExample {idx + 1}:")
-            logger.info(f"Target: {sample['truth'][:20]}...")
-            logger.info(f"Model:  {sample['pred'][:20]}...")
+    def run(self) -> None:
+        """Execute the primary loop over all test samples."""
+        num_samples = len(self.dataset)
+        logger.info(f"Starting evaluation on {num_samples} samples...")
+        total_ser = 0.0
+        processed_count = 0
 
-        return final_ser
+        for i in range(num_samples):
+            result = self._evaluate_single_sample(self.dataset[i], i)
+            if result is None: continue
+
+            total_ser += result["ser"]
+            processed_count += 1
+
+            with open(self.output_log_path, "a") as f:
+                f.write(json.dumps(result) + "\n")
+
+            if i % 50 == 0:
+                logger.info(f"[{i + 1}/{num_samples}] SER: {result['ser']:.4f} | Time: {result['inference_time_seconds']:.2f}s")
+
+        if processed_count > 0:
+            logger.info(f"DONE. Avg SER: {total_ser / processed_count:.4f}")
+
+
+def main() -> None:
+    """Handle CLI arguments and acts as the entrypoint for execution."""
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--spaces", action="store_true")
+    parser.add_argument("--model_path", type=str, required=True)
+    args = parser.parse_args()
+
+    evaluator = CipherEvaluator(model_path=args.model_path, use_spaces=args.spaces)
+    evaluator.run()
+
+
+if __name__ == "__main__":
+    main()
