@@ -10,39 +10,49 @@
 
 set -e
 
-# --- 1. DEFINE PATHS ---
+# --- 1. DEFINE PATHS & DYNAMIC FOLDER LOGIC ---
 PROJECT_DIR="/ceph/project/SW10-CausalLM/jamba"
 CONTAINER="${PROJECT_DIR}/pytorch_25.03-py3.sif"
 VENV_DIR="${PROJECT_DIR}/jamba_container"
-OUTPUT_DIR="${PROJECT_DIR}/jamba-cipher-results"
+
+# Check for the --spaced flag in the arguments passed to sbatch
+if [[ "$*" == *"--spaced"* ]]; then
+    OUTPUT_DIR="${PROJECT_DIR}/jamba-cipher-results-spaced"
+    SPACED_FLAG="--spaced"
+else
+    OUTPUT_DIR="${PROJECT_DIR}/jamba-cipher-results"
+    SPACED_FLAG=""
+fi
+
+MODEL_PATH="${OUTPUT_DIR}/final_model"
 
 cd $PROJECT_DIR
 mkdir -p logs
 
 # --- 2. PREPARE ENVIRONMENT ---
 echo "Starting evaluation job ${SLURM_JOB_ID} on $(hostname) at $(date)"
+echo "Targeting model at: ${MODEL_PATH}"
 
 # Ensure the model exists before spinning up the container
-if [ ! -d "${OUTPUT_DIR}/final_model" ]; then
-    echo "❌ Error: '${OUTPUT_DIR}/final_model' not found."
-    echo "Please ensure training has completed successfully."
+if [ ! -d "${MODEL_PATH}" ]; then
+    echo "Error: '${MODEL_PATH}' not found."
+    echo "Please ensure training has completed for this specific mode."
     exit 1
 fi
 
 export OMP_NUM_THREADS=8
 
 # --- 3. RUN EVALUATION INSIDE SINGULARITY ---
+# We pass the path and the flag directly to eval.py
 singularity exec --nv \
     --pwd $PROJECT_DIR \
     -B /ceph/project/SW10-CausalLM:/ceph/project/SW10-CausalLM \
-    -B ${VENV_DIR}:/scratch/venv \
     ${CONTAINER} /bin/bash -c "
-        export PYTHONPATH=''
+        export PYTHONPATH='$PROJECT_DIR/src'
         export PYTHONNOUSERSITE=1
-        source /scratch/venv/bin/activate
+        source ${VENV_DIR}/bin/activate
 
-        # Standard Python run; device_map='auto' in eval.py will handle the 4 GPUs
-        python src/eval.py
+        python src/eval.py --model_path ${MODEL_PATH} ${SPACED_FLAG}
     " | tee -a logs/eval_live_${SLURM_JOB_ID}.log
 
 echo "Evaluation finished at $(date)"

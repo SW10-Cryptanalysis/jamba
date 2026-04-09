@@ -153,7 +153,7 @@ class CipherEvaluator:
 def main() -> None:
     """Handle CLI arguments and acts as the entrypoint for execution."""
     parser = argparse.ArgumentParser()
-    parser.add_argument("--spaces", action="store_true")
+    parser.add_argument("--spaced", action="store_true")
     parser.add_argument("--model_path", type=str, required=True)
     args = parser.parse_args()
 
