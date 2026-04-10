@@ -125,7 +125,9 @@ class Config:
     def is_valid_init(self) -> bool:
         """Is valid based on initialization."""
         return (
-            self.vocab_size != 0 and self.max_context != 0 and self.unique_homophones != 0
+            self.jamba_config.vocab_size != 0 and
+            self.max_context != 0 and
+            self.unique_homophones != 0
         )
 
     jamba_config: JambaConfig = field(default_factory=JambaConfig)
