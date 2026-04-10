@@ -30,7 +30,9 @@ INIT_CASES = [
 def mock_config(mocker):
     """Fixture providing a mock Config with predictable token IDs."""
     mocker.patch.object(Config, "load_homophones")
-    return Config()
+    cfg = Config()
+    cfg.unique_homophones = 500
+    return cfg
 
 
 @pytest.mark.parametrize("case", INIT_CASES, ids=lambda c: c.name)

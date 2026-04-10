@@ -9,7 +9,8 @@ class ConfigTestCase:
     name: str
     file_exists: bool
     file_content: str
-    expect_error: bool
+    expected_error: Exception | None
+    expected_error_match: str | None
     expected_homophones: int
 
 
@@ -18,35 +19,40 @@ CONFIG_TEST_CASES = [
         name="valid_metadata",
         file_exists=True,
         file_content='{"max_symbol_id": 1000}',
-        expect_error=False,
+        expected_error=None,
+        expected_error_match=None,
         expected_homophones=1000,
     ),
     ConfigTestCase(
         name="invalid_json",
         file_exists=True,
         file_content="{malformed,}",
-        expect_error=True,
+        expected_error=ValueError,
+        expected_error_match="Invalid or missing 'max_symbol_id'",
         expected_homophones=500,  # Default fallback before crash
     ),
     ConfigTestCase(
         name="missing_key",
         file_exists=True,
         file_content='{"wrong_key": 100}',
-        expect_error=True,
+        expected_error=ValueError,
+        expected_error_match="Invalid or missing 'max_symbol_id'",
         expected_homophones=500,
     ),
     ConfigTestCase(
         name="file_not_found",
         file_exists=False,
         file_content="",
-        expect_error=True,
+        expected_error=FileNotFoundError,
+        expected_error_match="Cannot determine unique_homophones — aborting",
         expected_homophones=500,
     ),
 ]
 
 
 def test_config_properties(mocker):
-    # Mock file reading so we can cleanly test the properties without file IO
+    # Mock BOTH path existence and file reading
+    mocker.patch("os.path.exists", return_value=True)
     mocker.patch("builtins.open", mocker.mock_open(read_data='{"max_symbol_id": 500}'))
     cfg = Config()
 
@@ -64,6 +70,9 @@ def test_config_properties(mocker):
 
 @pytest.mark.parametrize("case", CONFIG_TEST_CASES, ids=lambda c: c.name)
 def test_config_load_homophones(mocker, case: ConfigTestCase):
+    # Mock os.path.exists dynamically based on the test case
+    mocker.patch("os.path.exists", return_value=case.file_exists)
+
     # Setup mocks for standard file operations
     if case.file_exists:
         mocker.patch("builtins.open", mocker.mock_open(read_data=case.file_content))
@@ -71,11 +80,8 @@ def test_config_load_homophones(mocker, case: ConfigTestCase):
         mocker.patch("builtins.open", side_effect=OSError("File not found"))
 
     # Execute and Assert
-    if case.expect_error:
-        with pytest.raises(
-            RuntimeError,
-            match="Aborting initialization: Invalid or missing homophone metadata.",
-        ):
+    if case.expected_error:
+        with pytest.raises(case.expected_error, match=case.expected_error_match):
             Config()
     else:
         cfg = Config()

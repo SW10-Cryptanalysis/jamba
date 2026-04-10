@@ -1,3 +1,4 @@
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
 import json
@@ -6,10 +7,9 @@ from utils.logging import get_logger
 
 logger = get_logger(__name__, level=20)
 
+MAX_PLAIN_SPACES = 13077
+MAX_PLAIN_NORMAL = 10063
 TRANSFORMER_VERSION = 5.3
-TEXT_LEN = 10_000
-UNIQUE_HOMOPHONES = 500
-TOTAL_SEQ = TEXT_LEN * 2
 BUFFER = 8
 
 BASE_DIR = Path(__file__).parent.parent.parent.parent
@@ -31,13 +31,12 @@ class JambaConfig:
         num_experts (int): Total number of experts in MoE layers.
         num_experts_per_tok (int): Number of experts to retrieve per token.
         expert_retrieval_size (int): Size of the retrieval vector for experts.
-        max_position_embeddings (int): Maximum context length.
         use_mamba_kernels (bool): Whether to use Mamba kernels.
         use_cache (bool): Whether to use caching in the model.
 
     """
 
-    vocab_size: int = UNIQUE_HOMOPHONES + 26 + BUFFER
+    vocab_size: int = 0
     hidden_size: int = 256
     num_hidden_layers: int = 8
     num_attention_heads: int = 8
@@ -48,7 +47,6 @@ class JambaConfig:
     num_experts: int = 8
     num_experts_per_tok: int = 2
     expert_retrieval_size: int = 256
-    max_position_embeddings: int = TOTAL_SEQ + 1
     use_mamba_kernels: bool = True
     use_cache: bool = False
 
@@ -85,7 +83,7 @@ class Config:
 
     """
 
-    unique_homophones: int = 500
+    unique_homophones: int = 0
     unique_letters: int = 26
 
     # Token IDs
@@ -115,6 +113,20 @@ class Config:
     def char_offset(self) -> int:
         """Character ofset to avoid clashes with defined tokens."""
         return self.eos_token_id + 1
+
+    @property
+    def max_context(self) -> int:
+        """Calculate dynamic variables after the dataclass is initialized."""
+        if self.use_spaces:
+            return (MAX_PLAIN_SPACES * 2) + BUFFER
+        return (MAX_PLAIN_NORMAL * 2) + BUFFER
+
+    @property
+    def is_valid_init(self) -> bool:
+        """Is valid based on initialization."""
+        return (
+            self.vocab_size != 0 and self.max_context != 0 and self.unique_homophones != 0
+        )
 
     jamba_config: JambaConfig = field(default_factory=JambaConfig)
 
@@ -155,13 +167,21 @@ class Config:
     def load_homophones(self, homophone_file: str = "metadata.json") -> None:
         """Load the homophone metadata file and set the unique homophone count."""
         homophone_path = self.data_dir / homophone_file
+        if not os.path.exists(homophone_path):
+            raise FileNotFoundError(
+                f"Metadata file not found at: {homophone_path}. "
+                "Cannot determine unique_homophones — aborting.",
+            )
         try:
             with open(homophone_path) as f:
                 meta = json.load(f)
                 self.unique_homophones = int(meta["max_symbol_id"])
-        except (OSError, ValueError, KeyError) as e:
-            logger.error(f"Critical failure loading {homophone_path}. Metadata is required for vocab sizing.")
-            raise RuntimeError("Aborting initialization: Invalid or missing homophone metadata.") from e
+        except OSError as e:
+            raise OSError(f"Could not read file: {homophone_path}") from e
+        except (ValueError, KeyError) as e:
+            raise ValueError(
+                f"Invalid or missing 'max_symbol_id' in {homophone_path}",
+            ) from e
 
         self.jamba_config.vocab_size = self.char_offset + self.unique_letters + 1
 

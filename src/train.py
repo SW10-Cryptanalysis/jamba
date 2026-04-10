@@ -19,6 +19,15 @@ def main() -> None:
 
     cfg.use_spaces = args.spaced
 
+    if not cfg.is_valid_init:
+        raise ValueError(
+            f"CRITICAL CONFIG ERROR: dimension was not initialized properly!\n"
+            f"vocab_size: {cfg.vocab_size}\n"
+            f"max_context: {cfg.max_context}\n"
+            f"unique_homophones: {cfg.unique_homophones}\n"
+            f"Check the Config class and load_homophones() method.",
+        )
+
     pipeline = JambaTrainingPipeline(config=cfg)
     pipeline.run()
 
