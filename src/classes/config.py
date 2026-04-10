@@ -81,6 +81,7 @@ class Config:
         data_dir (Path): Root directory containing cipher datasets.
         training_dir (Path): Directory containing the training dataset.
         validation_dir (Path): Directory containing the validation dataset.
+        use_spaces (bool): Whether to train on the spaced dataset.
 
     """
 
@@ -129,19 +130,27 @@ class Config:
     log_steps: int = 50
     save_steps: int = 1000
     eval_steps: int = 1000
+    use_spaces: bool = False
 
-    output_dir: Path = Path(__file__).parent.parent.parent / "jamba-cipher-results"
     data_dir: Path = BASE_DIR / "Ciphers"
+
+    @property
+    def output_dir(self) -> Path:
+        """Directory to save model checkpoints and logs."""
+        folder_name = "jamba-cipher-results-spaced" if self.use_spaces else "jamba-cipher-results"
+        return Path(__file__).parent.parent.parent / folder_name
 
     @property
     def training_dir(self) -> Path:
         """Directory containing the training dataset."""
-        return self.data_dir / "tokenized_normal" / "Training"
+        folder = "tokenized_spaced" if self.use_spaces else "tokenized_normal"
+        return self.data_dir / folder / "Training"
 
     @property
     def validation_dir(self) -> Path:
         """Directory containing the validation dataset."""
-        return self.data_dir / "tokenized_normal" / "Validation"
+        folder = "tokenized_spaced" if self.use_spaces else "tokenized_normal"
+        return self.data_dir / folder / "Validation"
 
     def load_homophones(self, homophone_file: str = "metadata.json") -> None:
         """Load the homophone metadata file and set the unique homophone count."""

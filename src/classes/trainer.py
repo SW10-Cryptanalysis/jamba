@@ -57,6 +57,7 @@ class JambaTrainingPipeline:
         logger.info("Initializing Model...")
         jamba_config = JambaConfig(**self.cfg.jamba_config.__dict__)
         model = JambaForCausalLM(jamba_config)
+        logger.info(f"Model initialized. Parameters: {model.num_parameters()}")
         return model.bfloat16()
 
     def _setup_trainer(self) -> Trainer:
