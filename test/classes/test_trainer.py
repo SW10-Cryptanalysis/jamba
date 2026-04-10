@@ -11,9 +11,13 @@ from classes.trainer import JambaTrainingPipeline
 @pytest.fixture
 def mock_config(mocker):
     mocker.patch.object(Config, "load_homophones")
+
+    # Mock the read-only property on the class level
+    mocker.patch.object(Config, "output_dir", new_callable=mocker.PropertyMock, return_value=Path("/mock/output"))
+
     cfg = Config()
-    cfg.output_dir = Path("/mock/output")
     cfg.data_dir = Path("/mock")
+    cfg.use_spaces = False
     return cfg
 
 
