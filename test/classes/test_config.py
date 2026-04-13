@@ -1,7 +1,8 @@
 import pytest
 from dataclasses import dataclass
+from pathlib import Path
 
-from classes.config import Config
+from classes.config import Config, MAX_PLAIN_NORMAL, MAX_PLAIN_SPACES, BUFFER
 
 
 @dataclass
@@ -49,6 +50,39 @@ CONFIG_TEST_CASES = [
     ),
 ]
 
+@pytest.mark.parametrize("use_spaces, expected_max, expected_folder", [
+    (False, (MAX_PLAIN_NORMAL * 2) + BUFFER, "jamba-cipher-results"),
+    (True, (MAX_PLAIN_SPACES * 2) + BUFFER, "jamba-cipher-results-spaced"),
+], ids=["normal_mode", "spaced_mode"])
+def test_config_dynamic_properties(mocker, use_spaces, expected_max, expected_folder):
+    """Test max_context and output_dir based on the use_spaces toggle."""
+    mocker.patch("os.path.exists", return_value=True)
+    mocker.patch("builtins.open", mocker.mock_open(read_data='{"max_symbol_id": 500}'))
+
+    # We set use_spaces via the constructor
+    cfg = Config(use_spaces=use_spaces)
+
+    assert cfg.max_context == expected_max
+    assert cfg.output_dir.name == expected_folder
+    # Ensure it's correctly relative to the project structure
+    assert isinstance(cfg.output_dir, Path)
+
+@pytest.mark.parametrize("homophones, vocab_size, expected_valid", [
+    (100, 132, True),   # Everything initialized
+    (0, 32, False),     # Missing homophones
+    (100, 0, False),    # Manual vocab override to 0
+], ids=["valid_state", "invalid_homophones", "invalid_vocab"])
+def test_is_valid_init(mocker, homophones, vocab_size, expected_valid):
+    """Test the safety check that ensures the model is ready for training."""
+    mocker.patch("os.path.exists", return_value=True)
+    mocker.patch("builtins.open", mocker.mock_open(read_data=f'{{"max_symbol_id": {homophones}}}'))
+
+    cfg = Config()
+    # Manually override vocab_size to test the boundary case
+    cfg.jamba_config.vocab_size = vocab_size
+
+    # max_context is checked here too; it will be > 0 due to BUFFER
+    assert cfg.is_valid_init == expected_valid
 
 def test_config_properties(mocker):
     # Mock BOTH path existence and file reading
