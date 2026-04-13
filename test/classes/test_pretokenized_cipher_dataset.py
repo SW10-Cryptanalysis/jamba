@@ -99,7 +99,7 @@ def test_dataset_getitem(mocker, mock_config, case: GetItemTestCase):
     mock_hf_dataset.__getitem__.return_value = case.item_dict
     mocker.patch("classes.pretokenized_cipher_dataset.load_from_disk", return_value=mock_hf_dataset)
 
-    mock_config.jamba_config.max_position_embeddings = case.max_len
+    mocker.patch.object(Config, "max_context", new_callable=mocker.PropertyMock, return_value=case.max_len)
     mocker.patch.dict(os.environ, {"LOCAL_RANK": "0"}, clear=True)
 
     dataset = PretokenizedCipherDataset("dummy_path", mock_config)
