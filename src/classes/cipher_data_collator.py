@@ -1,54 +1,75 @@
 import torch
-
+from typing import Any
+from torch.nn.utils.rnn import pad_sequence
 from classes.config import Config
 
 
 class CipherDataCollator:
     """Callable class to pad a batch of variable-length sequences.
 
-    Ensures that the special tokens are masked out in the labels and generates
-    the attention mask for the Jamba model to ignore padding.
-
-    Attributes:
-        config (Config): Configuration containing the padding token ID.
-
+    Truncates sequences to max_context, applies masking to special filler tokens,
+    pads the sequences, and generates the attention mask for the Jamba model.
     """
 
     def __init__(self, config: Config) -> None:
-        """Initialize the collator with the system configuration.
-
-        Args:
-            config (Config): System configuration containing token IDs.
-
-        """
+        """Initialize the collator with the given configuration."""
         self.config = config
+        self.ignore_index = -100
 
-    def __call__(self, batch: list[dict[str, torch.Tensor]]) -> dict[str, torch.Tensor]:
-        """Pad a batch of sequences and generate attention masks.
+    def _truncate(self, seq: list[int]) -> list[int]:
+        """Truncate sequences based on config max context."""
+        if self.config.max_context is None:
+            return seq
+        return seq[: self.config.max_context]
 
-        Args:
-            batch (list[dict[str, torch.Tensor]]): A list of dictionary samples.
+    def __call__(self, batch: list[dict[str, Any]]) -> dict[str, torch.Tensor]:
+        """Collate a batch of samples by truncating, masking, padding, and generating attention masks."""
+        if not batch:
+            return {
+                "input_ids": torch.empty((0, 0), dtype=torch.long),
+                "labels": torch.empty((0, 0), dtype=torch.long),
+                "attention_mask": torch.empty((0, 0), dtype=torch.long),
+            }
 
-        Returns:
-            dict[str, torch.Tensor]: A dict containing padded 'input_ids',
-                'attention_mask', and 'labels' tensors.
+        filler_tokens = [
+            self.config.bos_token_id,
+            self.config.eos_token_id,
+            self.config.space_token_id,
+        ]
 
-        """
-        input_ids = [item["input_ids"] for item in batch]
-        labels = [item["labels"] for item in batch]
+        input_tensors = []
+        label_tensors = []
 
-        input_ids_padded = torch.nn.utils.rnn.pad_sequence(
-            input_ids,
+        for item in batch:
+            # 1. Truncate
+            inp = self._truncate(item["input_ids"])
+            lab = self._truncate(item["labels"])
+
+            # 2. Convert to tensors
+            inp_t = torch.tensor(inp, dtype=torch.long)
+            lab_t = torch.tensor(lab, dtype=torch.long)
+
+            # 3. Mask special filler tokens
+            for t_id in filler_tokens:
+                lab_t[inp_t == t_id] = self.ignore_index
+
+            input_tensors.append(inp_t)
+            label_tensors.append(lab_t)
+
+        # 4. Pad sequences
+        input_ids_padded = pad_sequence(
+            input_tensors,
             batch_first=True,
             padding_value=self.config.pad_token_id,
         )
 
-        labels_padded = torch.nn.utils.rnn.pad_sequence(
-            labels,
+        labels_padded = pad_sequence(
+            label_tensors,
             batch_first=True,
-            padding_value=-100,
+            padding_value=self.ignore_index,
         )
 
+        # 5. Generate attention mask
         attention_mask = (input_ids_padded != self.config.pad_token_id).long()
 
         return {

@@ -9,7 +9,7 @@ class ConfigTestCase:
     name: str
     file_exists: bool
     file_content: str
-    expected_error: Exception | None
+    expected_error: type[Exception] | None
     expected_error_match: str | None
     expected_homophones: int
 

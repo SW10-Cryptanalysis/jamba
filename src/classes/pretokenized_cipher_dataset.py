@@ -65,20 +65,9 @@ class PretokenizedCipherDataset(Dataset):
 
         """
         item = self.hf_dataset[idx]
-        max_len = self.config.max_context
-
-        input_ids = item["input_ids"][:max_len]
-        labels = item["labels"][:max_len] if "labels" in item else list(input_ids)
-
-        input_ids_t = torch.tensor(input_ids, dtype=torch.long)
-        labels_t = torch.tensor(labels, dtype=torch.long)
-
-        filler_tokens = [self.config.bos_token_id, self.config.eos_token_id, self.config.space_token_id]
-
-        for t_id in filler_tokens:
-            labels_t[input_ids_t == t_id] = -100
+        labels = item["labels"] if "labels" in item else list(item["input_ids"])
 
         return {
-            "input_ids": input_ids_t,
-            "labels": labels_t,
+            "input_ids": item["input_ids"],
+            "labels": labels,
         }
