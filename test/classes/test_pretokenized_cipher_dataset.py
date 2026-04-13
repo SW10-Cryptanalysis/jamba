@@ -1,8 +1,6 @@
 import pytest
-import torch
 import os
 from dataclasses import dataclass
-from unittest.mock import MagicMock
 
 from classes.config import Config
 from classes.pretokenized_cipher_dataset import PretokenizedCipherDataset
@@ -49,19 +47,15 @@ GETITEM_CASES = [
 @pytest.fixture
 def mock_config(mocker):
     """Fixture providing a mock Config."""
-    # 1. Patch load_homophones on the CLASS before instantiation 
+    # 1. Patch load_homophones on the CLASS before instantiation
     # to prevent __post_init__ from hitting the disk.
     mocker.patch.object(Config, "load_homophones", return_value=None)
-    
+
     cfg = Config()
-    
+
     # 2. Set fields that have setters (standard dataclass fields)
     cfg.unique_homophones = 500
-    cfg.use_spaces = False 
-    
-    # NOTE: We removed cfg.max_context = 100 because it is a read-only property.
-    # Since the Dataset no longer uses it, we don't need to mock it here.
-    
+    cfg.use_spaces = False
     return cfg
 
 @pytest.mark.parametrize("case", INIT_CASES, ids=lambda c: c.name)

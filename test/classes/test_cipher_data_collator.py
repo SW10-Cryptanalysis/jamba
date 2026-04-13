@@ -43,9 +43,9 @@ def test_empty_batch(collator: "CipherDataCollator") -> None:
     ids=["truncates_to_max", "none_context_no_truncation", "under_max_no_truncation"]
 )
 def test_truncation(
-    mock_config: MagicMock, 
-    max_context: int | None, 
-    seq_len: int, 
+    mock_config: MagicMock,
+    max_context: int | None,
+    seq_len: int,
     expected_len: int
 ) -> None:
     """Tests that the collator respects the max_context limit."""
@@ -74,7 +74,7 @@ def test_truncation(
                 {"input_ids": [10, 11], "labels": [10, 11]},
                 {"input_ids": [10, 11, 12, 13], "labels": [10, 11, 12, 13]},
             ],
-            [[10, 11, 0, 0], [10, 11, 12, 13]], 
+            [[10, 11, 0, 0], [10, 11, 12, 13]],
             [[10, 11, -100, -100], [10, 11, 12, 13]],
             [[1, 1, 0, 0], [1, 1, 1, 1]]
         ),
@@ -94,17 +94,17 @@ def test_truncation(
                 {"input_ids": [10, 11], "labels": [10, 11]},
             ],
             [[1, 10, 2], [10, 11, 0]],
-            [[-100, 10, -100], [10, 11, -100]], 
+            [[-100, 10, -100], [10, 11, -100]],
             [[1, 1, 1], [1, 1, 0]]
         )
     ],
     ids=["standard_padding", "filler_token_masking", "mixed_lengths_and_tokens"]
 )
 def test_padding_and_masking(
-    collator: "CipherDataCollator", 
-    batch: list[dict[str, list[int]]], 
-    expected_input_ids: list[list[int]], 
-    expected_labels: list[list[int]], 
+    collator: "CipherDataCollator",
+    batch: list[dict[str, list[int]]],
+    expected_input_ids: list[list[int]],
+    expected_labels: list[list[int]],
     expected_attention_mask: list[list[int]]
 ) -> None:
     """Tests the core functionality of sequence padding and special token masking."""
