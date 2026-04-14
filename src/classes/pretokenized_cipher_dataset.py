@@ -1,5 +1,4 @@
 from typing import TypedDict
-import torch
 from pathlib import Path
 import os
 from datasets import load_from_disk
