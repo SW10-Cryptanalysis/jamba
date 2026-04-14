@@ -24,9 +24,9 @@ class CipherDataCollator:
 
     def _truncate(self, seq: list[int]) -> list[int]:
         """Truncate sequences based on config max context."""
-        if self.config.max_context is None:
+        if self.max_context is None:
             return seq
-        return seq[: self.config.max_context]
+        return seq[: self.max_context]
 
     def __call__(self, features: list[dict[str, Any]]) -> dict[str, torch.Tensor]:
         """Pad the batch to the maximum sequence length found in the features.
