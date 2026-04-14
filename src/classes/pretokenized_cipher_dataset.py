@@ -1,9 +1,8 @@
-from typing import TypedDict
-import torch
 from pathlib import Path
 import os
 from datasets import load_from_disk
 from torch.utils.data import Dataset
+from typing import TypedDict
 
 from classes.config import Config
 from utils.logging import get_logger
