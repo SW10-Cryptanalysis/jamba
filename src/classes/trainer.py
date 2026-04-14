@@ -83,7 +83,7 @@ class JambaTrainingPipeline:
 
         train_ds = PretokenizedCipherDataset(self.cfg.training_dir, self.cfg)
         eval_ds = PretokenizedCipherDataset(self.cfg.validation_dir, self.cfg)
-        data_collator = CipherDataCollator(self.cfg)
+        data_collator = CipherDataCollator(self.cfg.pad_token_id)
 
         return Trainer(
             model=self.model,
