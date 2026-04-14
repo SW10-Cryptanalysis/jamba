@@ -7,7 +7,7 @@ cd /work
 # Clone the repository and specific branch if it doesn't exist yet
 if [ ! -d "jamba" ]; then
     echo "Cloning repository..."
-    git clone -b dev https://github.com/SW10-Cryptanalysis/jamba.git
+    git clone -b UCloud https://github.com/SW10-Cryptanalysis/jamba.git
     cd jamba
 else
     echo "Git pulling newest changes..."
