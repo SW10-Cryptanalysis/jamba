@@ -33,6 +33,7 @@ class JambaConfig:
         expert_retrieval_size (int): Size of the retrieval vector for experts.
         use_mamba_kernels (bool): Whether to use Mamba kernels.
         use_cache (bool): Whether to use caching in the model.
+        max_position_embeddings (int): Maximum context length.
 
     """
 
@@ -49,6 +50,7 @@ class JambaConfig:
     expert_retrieval_size: int = 256
     use_mamba_kernels: bool = True
     use_cache: bool = False
+    max_position_embeddings: int = 0
 
 
 @dataclass
@@ -190,3 +192,4 @@ class Config:
     def __post_init__(self) -> None:
         """Post init hook."""
         self.load_homophones()
+        self.max_position_embeddings = self.max_context + BUFFER
