@@ -5,13 +5,16 @@ from dataclasses import dataclass
 from classes.config import Config
 from classes.pretokenized_cipher_dataset import PretokenizedCipherDataset
 
+
 @dataclass
 class InitTestCase:
     """Data for testing initialization and main process checking."""
+
     name: str
     dataset_len: int
     local_rank: str | None
     expect_warning: bool
+
 
 INIT_CASES = [
     InitTestCase("empty_dataset_main_process", 0, "0", True),
@@ -21,13 +24,17 @@ INIT_CASES = [
     InitTestCase("non_empty_dataset", 5, "0", False),
 ]
 
+
 @dataclass
 class GetItemTestCase:
     """Data for testing that the dataset correctly fetches raw lists."""
+
     name: str
     item_dict: dict[str, list[int]]
     expected_input_ids: list[int]
     expected_labels: list[int]
+    error: type[Exception] | None = None
+
 
 GETITEM_CASES = [
     GetItemTestCase(
@@ -37,12 +44,10 @@ GETITEM_CASES = [
         expected_labels=[10, 20, 30],
     ),
     GetItemTestCase(
-        name="no_labels_in_item_falls_back_to_input_ids",
-        item_dict={"input_ids": [1, 502, 3]},
-        expected_input_ids=[1, 502, 3],
-        expected_labels=[1, 502, 3],
+        name="no_labels_throws_error", item_dict={"input_ids": [1, 2, 3]}, expected_input_ids=[], expected_labels=[], error=KeyError
     ),
 ]
+
 
 @pytest.fixture
 def mock_config(mocker):
@@ -57,6 +62,7 @@ def mock_config(mocker):
     cfg.unique_homophones = 500
     cfg.use_spaces = False
     return cfg
+
 
 @pytest.mark.parametrize("case", INIT_CASES, ids=lambda c: c.name)
 def test_dataset_init_and_len(mocker, mock_config, case: InitTestCase):
@@ -80,6 +86,7 @@ def test_dataset_init_and_len(mocker, mock_config, case: InitTestCase):
     else:
         mock_logger.assert_not_called()
 
+
 @pytest.mark.parametrize("case", GETITEM_CASES, ids=lambda c: c.name)
 def test_dataset_getitem(mocker, mock_config, case: GetItemTestCase):
     """Test that the dataset retrieves raw lists without modification."""
@@ -88,6 +95,11 @@ def test_dataset_getitem(mocker, mock_config, case: GetItemTestCase):
     mocker.patch("classes.pretokenized_cipher_dataset.load_from_disk", return_value=mock_hf_dataset)
 
     dataset = PretokenizedCipherDataset("dummy_path", mock_config)
+
+    if case.error:
+        with pytest.raises(case.error):
+            dataset[0]
+        return
     result = dataset[0]
 
     assert result["input_ids"] == case.expected_input_ids
