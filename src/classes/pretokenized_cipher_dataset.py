@@ -1,14 +1,19 @@
-import torch
 from pathlib import Path
 import os
 from datasets import load_from_disk
 from torch.utils.data import Dataset
+from typing import TypedDict
 
 from classes.config import Config
 from utils.logging import get_logger
 
 logger = get_logger(__name__, level=20)
 
+class CipherPlainDataItem(TypedDict):
+    """TypedDict for CipherPlainDataItem."""
+
+    input_ids: list[int]
+    labels: list[int]
 
 class PretokenizedCipherDataset(Dataset):
     """A PyTorch Dataset class for loading pre-tokenized cipher data from disk.
@@ -53,7 +58,7 @@ class PretokenizedCipherDataset(Dataset):
         """
         return len(self.hf_dataset)
 
-    def __getitem__(self, idx: int) -> dict[str, torch.Tensor]:
+    def __getitem__(self, idx: int) -> CipherPlainDataItem:
         """Get a single item from the dataset and applies masking to the special tokens.
 
         Args:
@@ -65,20 +70,8 @@ class PretokenizedCipherDataset(Dataset):
 
         """
         item = self.hf_dataset[idx]
-        max_len = self.config.jamba_config.max_position_embeddings
-
-        input_ids = item["input_ids"][:max_len]
-        labels = item["labels"][:max_len] if "labels" in item else list(input_ids)
-
-        input_ids_t = torch.tensor(input_ids, dtype=torch.long)
-        labels_t = torch.tensor(labels, dtype=torch.long)
-
-        filler_tokens = [self.config.bos_token_id, self.config.eos_token_id, self.config.space_token_id]
-
-        for t_id in filler_tokens:
-            labels_t[input_ids_t == t_id] = -100
 
         return {
-            "input_ids": input_ids_t,
-            "labels": labels_t,
+            "input_ids": item["input_ids"],
+            "labels": item["labels"],
         }

@@ -1,8 +1,8 @@
 import pytest
 import sys
+import os
 from pathlib import Path
 from dataclasses import dataclass
-from unittest.mock import MagicMock
 
 from classes.config import TRANSFORMER_VERSION, Config
 from classes.trainer import JambaTrainingPipeline
@@ -10,14 +10,16 @@ from classes.trainer import JambaTrainingPipeline
 
 @pytest.fixture
 def mock_config(mocker):
+    """Provides a mocked Config object for the pipeline."""
     mocker.patch.object(Config, "load_homophones")
-
-    # Mock the read-only property on the class level
     mocker.patch.object(Config, "output_dir", new_callable=mocker.PropertyMock, return_value=Path("/mock/output"))
+    mocker.patch.object(Config, "training_dir", new_callable=mocker.PropertyMock, return_value=Path("/mock/train"))
+    mocker.patch.object(Config, "validation_dir", new_callable=mocker.PropertyMock, return_value=Path("/mock/val"))
 
     cfg = Config()
     cfg.data_dir = Path("/mock")
     cfg.use_spaces = False
+    cfg.pad_token_id = 0
     return cfg
 
 
@@ -27,9 +29,6 @@ def mock_pipeline(mock_config):
     pipeline = object.__new__(JambaTrainingPipeline)
     pipeline.cfg = mock_config
     return pipeline
-
-
-# --- Test Initialization ---
 
 
 def test_pipeline_init(mocker, mock_config):
@@ -54,11 +53,10 @@ def test_pipeline_init(mocker, mock_config):
     assert pipeline.checkpoint_manager == mock_ckpt_mgr.return_value
 
 
-# --- Test Version Verification ---
-
-
 @dataclass
 class VersionCheckCase:
+    """Test cases for version verification."""
+
     name: str
     version: str
     expect_error: bool
@@ -73,20 +71,20 @@ class VersionCheckCase:
     ids=lambda c: c.name,
 )
 def test_verify_transformers_version(mocker, mock_pipeline, case: VersionCheckCase):
+    """Tests that the transformers version check behaves as expected."""
     mocker.patch("transformers.__version__", case.version)
 
     if case.expect_error:
         with pytest.raises(RuntimeError, match=f"Requires v{TRANSFORMER_VERSION}.x, found {case.version}"):
             mock_pipeline._verify_transformers_version()
     else:
-        mock_pipeline._verify_transformers_version()  # Should not raise
-
-
-# --- Test Mamba Kernel Injection ---
+        mock_pipeline._verify_transformers_version()
 
 
 @dataclass
 class KernelInjectCase:
+    """Test cases for kernel injection logic."""
+
     name: str
     setup_type: str
 
@@ -101,13 +99,13 @@ class KernelInjectCase:
     ids=lambda c: c.name,
 )
 def test_inject_mamba_kernels(mocker, mock_pipeline, case: KernelInjectCase):
+    """Tests the Mamba kernel injection bridging logic and fallback behaviors."""
     mock_mamba = mocker.Mock()
     mock_causal = mocker.Mock()
     mock_jamba = mocker.Mock()
     mock_ssu = mocker.Mock()
     mock_ssd = mocker.Mock()
 
-    # Build parent mocks to prevent Python's import system from generating detached child mocks
     mock_transformers = mocker.Mock()
     mock_transformers.models.jamba.modeling_jamba = mock_jamba
 
@@ -130,7 +128,6 @@ def test_inject_mamba_kernels(mocker, mock_pipeline, case: KernelInjectCase):
         "causal_conv1d": mock_causal,
     }
 
-    # Simulate ImportError by removing from sys.modules AND deleting attributes
     if case.setup_type == "fail":
         modules["mamba_ssm.ops.selective_scan_interface"] = None
         del mock_mamba_parent.ops.selective_scan_interface
@@ -157,10 +154,8 @@ def test_inject_mamba_kernels(mocker, mock_pipeline, case: KernelInjectCase):
             assert mock_jamba.selective_state_update == mock_ssd.mamba_split_conv_open_loop_scan_combined
 
 
-# --- Test Model and Trainer Setup ---
-
-
 def test_initialize_model(mocker, mock_pipeline):
+    """Tests the initialization and configuration of the Jamba model."""
     mock_jamba_config = mocker.patch("classes.trainer.JambaConfig")
     mock_jamba_lm = mocker.patch("classes.trainer.JambaForCausalLM")
 
@@ -173,6 +168,7 @@ def test_initialize_model(mocker, mock_pipeline):
 
 
 def test_setup_trainer(mocker, mock_pipeline):
+    """Tests the setup of the Hugging Face Trainer and data collator."""
     mock_args = mocker.patch("classes.trainer.TrainingArguments")
     mock_ds = mocker.patch("classes.trainer.PretokenizedCipherDataset")
     mock_collator = mocker.patch("classes.trainer.CipherDataCollator")
@@ -183,7 +179,11 @@ def test_setup_trainer(mocker, mock_pipeline):
 
     mock_args.assert_called_once()
     assert mock_ds.call_count == 2
-    mock_collator.assert_called_once_with(mock_pipeline.cfg)
+    mock_ds.assert_any_call(mock_pipeline.cfg.training_dir, mock_pipeline.cfg)
+    mock_ds.assert_any_call(mock_pipeline.cfg.validation_dir, mock_pipeline.cfg)
+
+    mock_collator.assert_called_once_with(mock_pipeline.cfg.pad_token_id)
+
     mock_trainer.assert_called_once_with(
         model="mock_model",
         args=mock_args.return_value,
@@ -194,11 +194,10 @@ def test_setup_trainer(mocker, mock_pipeline):
     assert trainer == mock_trainer.return_value
 
 
-# --- Test Run Execution Loop ---
-
-
 @dataclass
 class RunCase:
+    """Test cases for the main training execution loop."""
+
     name: str
     last_ckpt: str | None
     is_zero_process: bool
@@ -214,12 +213,13 @@ class RunCase:
     ids=lambda c: c.name,
 )
 def test_run(mocker, mock_pipeline, case: RunCase):
+    """Tests the execution run, verifying checkpoint loading and model saving."""
     mock_get_last_ckpt = mocker.patch("classes.trainer.get_last_checkpoint", return_value=case.last_ckpt)
     mock_logger = mocker.patch("classes.trainer.logger")
 
-    mock_pipeline.trainer = MagicMock()
+    mock_pipeline.trainer = mocker.Mock()
     mock_pipeline.trainer.is_world_process_zero.return_value = case.is_zero_process
-    mock_pipeline.checkpoint_manager = MagicMock()
+    mock_pipeline.checkpoint_manager = mocker.Mock()
 
     mock_pipeline.run()
 
@@ -235,9 +235,6 @@ def test_run(mocker, mock_pipeline, case: RunCase):
     mock_pipeline.trainer.train.assert_called_once_with(resume_from_checkpoint=case.last_ckpt)
 
     if case.is_zero_process:
-        # Note: os.path.join resolves differently based on OS, so we verify exact arg passed
-        import os
-
         expected_save_path = os.path.join(str(mock_pipeline.cfg.output_dir), "final_model")
         mock_pipeline.trainer.save_model.assert_called_once_with(expected_save_path)
     else:
