@@ -1,3 +1,4 @@
+from typing import TypedDict
 import torch
 from pathlib import Path
 import os
@@ -9,6 +10,11 @@ from utils.logging import get_logger
 
 logger = get_logger(__name__, level=20)
 
+class CipherPlainDataItem(TypedDict):
+    """TypedDict for CipherPlainDataItem."""
+
+    input_ids: list[int]
+    labels: list[int]
 
 class PretokenizedCipherDataset(Dataset):
     """A PyTorch Dataset class for loading pre-tokenized cipher data from disk.
@@ -53,7 +59,7 @@ class PretokenizedCipherDataset(Dataset):
         """
         return len(self.hf_dataset)
 
-    def __getitem__(self, idx: int) -> dict[str, torch.Tensor]:
+    def __getitem__(self, idx: int) -> CipherPlainDataItem:
         """Get a single item from the dataset and applies masking to the special tokens.
 
         Args:
@@ -65,9 +71,8 @@ class PretokenizedCipherDataset(Dataset):
 
         """
         item = self.hf_dataset[idx]
-        labels = item["labels"] if "labels" in item else list(item["input_ids"])
 
         return {
             "input_ids": item["input_ids"],
-            "labels": labels,
+            "labels": item["labels"],
         }
