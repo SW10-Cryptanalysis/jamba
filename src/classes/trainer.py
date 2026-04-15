@@ -56,7 +56,7 @@ class JambaTrainingPipeline:
         """Instantiate the Jamba model using the configuration dataclass."""
         logger.info("Initializing Model...")
         jamba_config = JambaConfig(**self.cfg.jamba_config.__dict__)
-        model = JambaForCausalLM(jamba_config, attn_implementation="flash_attention_2")
+        model = JambaForCausalLM(jamba_config)
         logger.info(f"Model initialized. Parameters: {model.num_parameters()}")
         return model.bfloat16()
 
@@ -78,7 +78,7 @@ class JambaTrainingPipeline:
             save_total_limit=2,
             ignore_data_skip=True,
             load_best_model_at_end=True,
-            greater_is_better=True,
+            greater_is_better=False,
             metric_for_best_model="eval_loss",
             bf16=self.cfg.bf16,
             push_to_hub=False,

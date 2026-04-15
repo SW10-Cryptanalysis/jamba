@@ -34,6 +34,7 @@ class JambaConfig:
         use_mamba_kernels (bool): Whether to use Mamba kernels.
         use_cache (bool): Whether to use caching in the model.
         max_position_embeddings (int): Maximum context length.
+        attn_implementation (str): Attention mechanism.
 
     """
 
@@ -51,6 +52,7 @@ class JambaConfig:
     use_mamba_kernels: bool = True
     use_cache: bool = False
     max_position_embeddings: int = 0
+    attn_implementation: str = "flash_attention_2"
 
 
 @dataclass
@@ -126,11 +128,7 @@ class Config:
     @property
     def is_valid_init(self) -> bool:
         """Is valid based on initialization."""
-        return (
-            self.jamba_config.vocab_size != 0 and
-            self.max_context != 0 and
-            self.unique_homophones != 0
-        )
+        return self.jamba_config.vocab_size != 0 and self.max_context != 0 and self.unique_homophones != 0
 
     jamba_config: JambaConfig = field(default_factory=JambaConfig)
 
@@ -173,8 +171,7 @@ class Config:
         homophone_path = self.data_dir / homophone_file
         if not os.path.exists(homophone_path):
             raise FileNotFoundError(
-                f"Metadata file not found at: {homophone_path}. "
-                "Cannot determine unique_homophones — aborting.",
+                f"Metadata file not found at: {homophone_path}. Cannot determine unique_homophones — aborting.",
             )
         try:
             with open(homophone_path) as f:
