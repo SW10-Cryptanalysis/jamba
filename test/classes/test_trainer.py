@@ -162,7 +162,7 @@ def test_initialize_model(mocker, mock_pipeline):
     model = mock_pipeline._initialize_model()
 
     mock_jamba_config.assert_called_once()
-    mock_jamba_lm.assert_called_once_with(mock_jamba_config.return_value)
+    mock_jamba_lm.assert_called_once_with(mock_jamba_config.return_value, attn_implementation="flash_attention_2")
     mock_jamba_lm.return_value.bfloat16.assert_called_once()
     assert model == mock_jamba_lm.return_value.bfloat16.return_value
 
