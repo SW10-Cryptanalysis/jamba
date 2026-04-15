@@ -38,6 +38,8 @@ sbatch --dependency=afterany:$SLURM_JOB_ID run_training.slurm "$@" || echo "Warn
 # --- 3. PREPARE ENVIRONMENT ---
 echo "Starting job ${SLURM_JOB_ID} on $(hostname) at $(date) with output at ${OUTPUT_DIR}"
 
+echo "REMEMBER TO DOWNLOAD FLASH_ATT TO CONTAINER BEFORE TRAINING, OTHERWISE OOM"
+
 export OMP_NUM_THREADS=8
 MASTER_PORT=$((10000 + $RANDOM % 20000))
 

@@ -56,7 +56,7 @@ class JambaTrainingPipeline:
         """Instantiate the Jamba model using the configuration dataclass."""
         logger.info("Initializing Model...")
         jamba_config = JambaConfig(**self.cfg.jamba_config.__dict__)
-        model = JambaForCausalLM(jamba_config)
+        model = JambaForCausalLM(jamba_config, attn_implementation="flash_attention_2")
         logger.info(f"Model initialized. Parameters: {model.num_parameters()}")
         return model.bfloat16()
 
@@ -67,6 +67,7 @@ class JambaTrainingPipeline:
             per_device_train_batch_size=self.cfg.batch_size,
             gradient_accumulation_steps=self.cfg.grad_accum,
             gradient_checkpointing=self.cfg.grad_checkpoint,
+            gradient_checkpointing_kwargs={"use_reentrant": False},
             num_train_epochs=self.cfg.epochs,
             learning_rate=self.cfg.learning_rate,
             logging_steps=self.cfg.log_steps,
