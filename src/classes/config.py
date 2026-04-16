@@ -54,7 +54,7 @@ class JambaConfig:
     use_cache: bool = False
     max_position_embeddings: int = 0
     attn_implementation: str = "flash_attention_2"
-    torch_dtype = torch.bfloat16
+    torch_dtype: torch.dtype = torch.bfloat16
 
 
 @dataclass
