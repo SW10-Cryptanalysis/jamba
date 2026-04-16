@@ -39,7 +39,7 @@ class JambaConfig:
     """
 
     vocab_size: int = 0
-    hidden_size: int = 256
+    hidden_size: int = 384
     num_hidden_layers: int = 8
     num_attention_heads: int = 8
     num_key_value_heads: int = 2
