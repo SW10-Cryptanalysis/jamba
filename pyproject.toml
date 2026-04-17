@@ -9,7 +9,7 @@ dependencies = [
   "einops>=0.8.2",
   "datasets>=4.6.0",
   "numpy<2.0.0; sys_platform == 'darwin' and platform_machine == 'x86_64'",
-  "torch>=2.10.0; sys_platform != 'darwin' or platform_machine != 'x86_64'",
+  "torch>=2.7.0; sys_platform != 'darwin' or platform_machine != 'x86_64'",
   "torch<2.3.0; sys_platform == 'darwin' and platform_machine == 'x86_64'",
   "causal-conv1d>=1.6.0; sys_platform == 'linux'",
   "mamba-ssm>=2.3.0; sys_platform == 'linux'",
@@ -20,7 +20,7 @@ dependencies = [
   "transformers>=5.3.0",
   "easy-logging-formatter>=0.1.1",
   "torchvision>=0.17.2",
-  "flash-attn @ https://github.com/Dao-AILab/flash-attention/releases/download/v2.8.3/flash_attn-2.8.3+cu12torch2.10cxx11abiTRUE-cp312-cp312-linux_x86_64.whl"
+  "flash-attn @ https://github.com/Dao-AILab/flash-attention/releases/download/v2.8.3/flash_attn-2.8.3+cu12torch2.7cxx11abiTRUE-cp312-cp312-linux_x86_64.whl"
 ]
 
 [dependency-groups]
