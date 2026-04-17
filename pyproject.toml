@@ -9,7 +9,7 @@ dependencies = [
   "einops>=0.8.2",
   "datasets>=4.6.0",
   "numpy<2.0.0; sys_platform == 'darwin' and platform_machine == 'x86_64'",
-  "torch>=2.9.0; sys_platform != 'darwin' or platform_machine != 'x86_64'",
+  "torch>=2.10.0; sys_platform != 'darwin' or platform_machine != 'x86_64'",
   "torch<2.3.0; sys_platform == 'darwin' and platform_machine == 'x86_64'",
   "causal-conv1d>=1.6.0; sys_platform == 'linux'",
   "mamba-ssm>=2.3.0; sys_platform == 'linux'",
