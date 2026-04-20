@@ -1,7 +1,10 @@
 import argparse
+import torch
+
 from classes.trainer import JambaTrainingPipeline
 from classes.config import Config
 
+torch.backends.cuda.enable_math_sdp(False)
 
 def main() -> None:
     """Execute the training loop, handling checkpoints and final model saving."""
