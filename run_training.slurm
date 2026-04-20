@@ -2,7 +2,7 @@
 #SBATCH --job-name=jamba_cipher
 #SBATCH --output=logs/slurm_%x_%j.out
 #SBATCH --error=logs/slurm_%x_%j.err
-#SBATCH --time=01:00:00
+#SBATCH --time=12:00:00
 #SBATCH --partition=l4
 #SBATCH --cpus-per-task=32
 #SBATCH --mem=64G
