@@ -20,7 +20,11 @@ dependencies = [
   "transformers>=5.3.0",
   "easy-logging-formatter>=0.1.1",
   "torchvision>=0.17.2",
+  "flash-attn; sys_platform == 'linux'",
 ]
+
+[tool.uv.sources]
+flash-attn = { url = "https://github.com/SW10-Cryptanalysis/jamba/releases/download/v0.1.0/flash_attn-2.7.3-cp312-cp312-linux_x86_64.whl" }
 
 [dependency-groups]
 dev = [
