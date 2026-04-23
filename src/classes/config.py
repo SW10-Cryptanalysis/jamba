@@ -191,4 +191,4 @@ class Config:
     def __post_init__(self) -> None:
         """Post init hook."""
         self.load_homophones()
-        self.max_position_embeddings = self.max_context + BUFFER
+        self.jamba_config.max_position_embeddings = self.max_context + BUFFER
