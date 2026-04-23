@@ -55,8 +55,12 @@ class JambaTrainingPipeline:
     def _initialize_model(self) -> JambaForCausalLM:
         """Instantiate the Jamba model using the configuration dataclass."""
         logger.info("Initializing Model...")
-        jamba_config = JambaConfig(**self.cfg.jamba_config.__dict__)
-        model = JambaForCausalLM(jamba_config)
+        config_dict = self.cfg.jamba_config.__dict__.copy()
+        attn_impl = config_dict.pop("attn_implementation", "flash_attention_2")
+
+        hf_config = JambaConfig(**config_dict)
+        hf_config._attn_implementation = attn_impl
+        model = JambaForCausalLM(hf_config)
         logger.info(f"Model initialized. Parameters: {model.num_parameters()}")
         return model.bfloat16()
 
