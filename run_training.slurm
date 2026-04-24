@@ -15,6 +15,20 @@ PROJECT_DIR="/ceph/project/SW10-CausalLM/jamba"
 CONTAINER="${PROJECT_DIR}/pytorch_25.03-py3.sif"
 VENV_DIR="${PROJECT_DIR}/jamba_container"
 
+if [ ! -d "${VENV_DIR}" ]; then
+    echo "Virtual environment not found. Building it now with system packages..."
+    singularity exec --nv \
+        --pwd $PROJECT_DIR \
+        -B /ceph/project/SW10-CausalLM:/ceph/project/SW10-CausalLM \
+        ${CONTAINER} /bin/bash -c "
+            uv venv ${VENV_DIR} --system-site-packages
+            source ${VENV_DIR}/bin/activate
+            uv sync
+        "
+else
+    echo "Virtual environment already exists. Skipping build."
+fi
+
 # Check if "--spaced" was passed in the arguments to the SLURM script
 if [[ "$*" == *"--spaced"* ]]; then
     OUTPUT_DIR="${PROJECT_DIR}/jamba-cipher-results-spaced"
