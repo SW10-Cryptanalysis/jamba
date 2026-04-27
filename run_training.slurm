@@ -21,8 +21,19 @@ if [ ! -d "${VENV_DIR}" ]; then
         --pwd $PROJECT_DIR \
         -B /ceph/project/SW10-CausalLM:/ceph/project/SW10-CausalLM \
         ${CONTAINER} /bin/bash -c "
-            uv venv ${VENV_DIR} --system-site-packages
+            # Fail fast: exit immediately if any command inside the container fails
+            set -e 
+            
+            echo 'Creating virtual environment using built-in venv...'
+            python -m venv ${VENV_DIR} --system-site-packages
+            
+            echo 'Activating environment...'
             source ${VENV_DIR}/bin/activate
+            
+            echo 'Installing uv into the virtual environment...'
+            python -m pip install uv
+            
+            echo 'Syncing dependencies via uv...'
             uv sync
         "
 else
