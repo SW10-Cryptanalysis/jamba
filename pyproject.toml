@@ -23,8 +23,8 @@ dependencies = [
   "flash-attn; sys_platform == 'linux'",
 ]
 
-#[tool.uv.sources]
-#flash-attn = { url = "https://github.com/SW10-Cryptanalysis/jamba/releases/download/v0.1.0/flash_attn-2.7.3-cp312-cp312-linux_x86_64.whl" }
+[tool.uv.sources]
+flash-attn = { url = "https://github.com/SW10-Cryptanalysis/jamba/releases/download/v0.1.0/flash_attn-2.7.3-cp312-cp312-linux_x86_64.whl" }
 
 [dependency-groups]
 dev = [
@@ -107,6 +107,3 @@ ignore = [
 ]
 [tool.ruff.format]
 indent-style = "space"
-
-[tool.uv.extra-build-dependencies]
-flash-attn = ["torch"]
