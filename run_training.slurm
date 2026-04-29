@@ -35,7 +35,7 @@ if [ ! -d "${VENV_DIR}" ]; then
             python -m pip install uv
             
             echo 'Syncing dependencies via uv...'
-            uv sync
+            uv sync --active
         "
 else
     echo "Virtual environment already exists. Skipping build."
