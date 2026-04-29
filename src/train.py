@@ -1,7 +1,7 @@
 import argparse
+
 from classes.trainer import JambaTrainingPipeline
 from classes.config import Config
-
 
 def main() -> None:
     """Execute the training loop, handling checkpoints and final model saving."""
