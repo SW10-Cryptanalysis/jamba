@@ -107,3 +107,6 @@ ignore = [
 ]
 [tool.ruff.format]
 indent-style = "space"
+
+[tool.uv.extra-build-dependencies]
+flash-attn = ["torch"]

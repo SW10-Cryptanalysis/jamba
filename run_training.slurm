@@ -9,6 +9,7 @@
 #SBATCH --gres=gpu:l4:1
 
 set -x
+set -e
 
 # --- 1. DEFINE PATHS & DYNAMIC OUTPUT ---
 PROJECT_DIR="/ceph/project/SW10-CausalLM/jamba"
