@@ -13,7 +13,7 @@ set -e
 
 # --- 1. DEFINE PATHS & DYNAMIC OUTPUT ---
 PROJECT_DIR="/ceph/project/SW10-CausalLM/jamba"
-CONTAINER="${PROJECT_DIR}/pytorch_25.03-py3.sif"
+CONTAINER="${PROJECT_DIR}/pytorch_25.06-py3.sif"
 VENV_DIR="${PROJECT_DIR}/jamba_container"
 
 # Check if "--spaced" was passed in the arguments to the SLURM script
