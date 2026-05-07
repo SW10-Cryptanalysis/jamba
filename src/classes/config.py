@@ -53,7 +53,7 @@ class JambaConfig:
     use_mamba_kernels: bool = True
     use_cache: bool = False
     max_position_embeddings: int = 0
-    attn_implementation: str = "flash_attention_2"
+    attn_implementation: str = "sdpa"
     torch_dtype: torch.dtype = torch.bfloat16
 
 
@@ -159,13 +159,13 @@ class Config:
     @property
     def training_dir(self) -> Path:
         """Directory containing the training dataset."""
-        folder = "tokenized_spaced" if self.use_spaces else "tokenized_normal"
+        folder = "tokenized_spaced_truncated_4000" if self.use_spaces else "tokenized_normal_truncated_4000"
         return self.data_dir / folder / "Training"
 
     @property
     def validation_dir(self) -> Path:
         """Directory containing the validation dataset."""
-        folder = "tokenized_spaced" if self.use_spaces else "tokenized_normal"
+        folder = "tokenized_spaced_truncated_4000" if self.use_spaces else "tokenized_normal_truncated_4000"
         return self.data_dir / folder / "Validation"
 
     def load_homophones(self, homophone_file: str = "metadata.json") -> None:
