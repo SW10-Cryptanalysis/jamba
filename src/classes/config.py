@@ -144,7 +144,7 @@ class Config:
     dataloader_num_workers: int = 4
 
     log_steps: int = 50
-    save_steps: int = 25000
+    save_steps: int = 20000
     eval_steps: int = 10000
     use_spaces: bool = False
 
