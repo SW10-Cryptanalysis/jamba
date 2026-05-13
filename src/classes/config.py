@@ -134,7 +134,7 @@ class Config:
 
     jamba_config: JambaConfig = field(default_factory=JambaConfig)
 
-    batch_size: int = 16
+    batch_size: int = 2
     grad_accum: int = 8
     learning_rate: float = 3e-4
     epochs: int = 3
@@ -144,8 +144,8 @@ class Config:
     dataloader_num_workers: int = 4
 
     log_steps: int = 50
-    save_steps: int = 20000
-    eval_steps: int = 10000
+    save_steps: int = 5000
+    eval_steps: int = 1000
     use_spaces: bool = False
 
     data_dir: Path = BASE_DIR / "Ciphers"
