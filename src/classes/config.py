@@ -134,7 +134,7 @@ class Config:
 
     jamba_config: JambaConfig = field(default_factory=JambaConfig)
 
-    batch_size: int = 16
+    batch_size: int = 4
     grad_accum: int = 1
     learning_rate: float = 3e-4
     epochs: int = 3
