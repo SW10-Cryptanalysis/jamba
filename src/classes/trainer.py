@@ -108,14 +108,31 @@ class JambaTrainingPipeline:
     def run(self) -> None:
         """Execute the training loop, handling checkpoints and final model saving."""
         output_dir_str = str(self.cfg.output_dir)
-        last_checkpoint = get_last_checkpoint(output_dir_str)
 
+        # 1. Define your custom UCloud checkpoint path
+        # Note: Since your train.sh does `cd /work/jamba`, `../Models/Jamba/` 
+        # resolves to `/work/Models/Jamba/`. Using absolute paths is often safer.
+        custom_checkpoint_dir = "../Models/Jamba/"
+
+        # 2. Check the custom path first
+        last_checkpoint = None
+        if os.path.exists(custom_checkpoint_dir):
+            # get_last_checkpoint looks for "checkpoint-XXXX" folders inside the given directory
+            last_checkpoint = get_last_checkpoint(custom_checkpoint_dir)
+
+        # 3. Fallback to the standard output directory if nothing was in the custom path
+        if last_checkpoint is None:
+            last_checkpoint = get_last_checkpoint(output_dir_str)
+
+        # 4. Standard resume logic
         if last_checkpoint is not None:
             logger.info(f"Found checkpoint: {last_checkpoint}. Resuming...")
-            self.checkpoint_manager.prepare_for_fast_path(output_dir_str)
+            # Keep this pointing to output_dir_str assuming your manager uses it for current run state
+            self.checkpoint_manager.prepare_for_fast_path(output_dir_str) 
         else:
-            logger.warning("No checkpoint found. Starting training from scratch.")
+            logger.warning(f"No checkpoint found in {custom_checkpoint_dir} or {output_dir_str}. Starting training from scratch.")
 
+        # 5. Pass the located checkpoint path directly to the trainer
         self.trainer.train(resume_from_checkpoint=last_checkpoint)
 
         if self.trainer.is_world_process_zero():
