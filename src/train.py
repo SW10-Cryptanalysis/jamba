@@ -19,6 +19,8 @@ def main() -> None:
 
     cfg.use_spaces = args.spaced
 
+    print(f"Token IDs - BOS: {cfg.bos_token_id}, EOS: {cfg.eos_token_id}, SEP: {cfg.sep_token_id}, SPACE: {cfg.space_token_id}")
+
     if not cfg.is_valid_init:
         raise ValueError(
             f"CRITICAL CONFIG ERROR: dimension was not initialized properly!\n"

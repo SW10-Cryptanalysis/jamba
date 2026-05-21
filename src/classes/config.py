@@ -55,6 +55,10 @@ class JambaConfig:
     max_position_embeddings: int = 0
     attn_implementation: str = "sdpa"
     torch_dtype: torch.dtype = torch.bfloat16
+    sep_token_id: int = field(init=False)
+    eos_token_id: int = field(init=False)
+    bos_token_id: int = field(init=False)
+    pad_token_id: int = field(init=False)
 
 
 @dataclass
@@ -130,7 +134,7 @@ class Config:
     @property
     def is_valid_init(self) -> bool:
         """Is valid based on initialization."""
-        return self.jamba_config.vocab_size != 0 and self.max_context != 0 and self.unique_homophones != 0
+        return self.jamba_config.vocab_size > 0 and self.max_context > 0 and self.unique_homophones > 0
 
     jamba_config: JambaConfig = field(default_factory=JambaConfig)
 
@@ -144,8 +148,8 @@ class Config:
     dataloader_num_workers: int = 4
 
     log_steps: int = 50
-    save_steps: int = 20000
-    eval_steps: int = 10000
+    save_steps: int = 2000
+    eval_steps: int = 1000
     use_spaces: bool = False
 
     data_dir: Path = BASE_DIR / "Ciphers"
@@ -187,6 +191,10 @@ class Config:
             ) from e
 
         self.jamba_config.vocab_size = self.char_offset + self.unique_letters + 1
+        self.jamba_config.sep_token_id = self.sep_token_id
+        self.jamba_config.eos_token_id = self.eos_token_id
+        self.jamba_config.bos_token_id = self.bos_token_id
+        self.jamba_config.pad_token_id = self.pad_token_id
 
     def __post_init__(self) -> None:
         """Post init hook."""
