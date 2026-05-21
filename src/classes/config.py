@@ -148,8 +148,8 @@ class Config:
     dataloader_num_workers: int = 4
 
     log_steps: int = 50
-    save_steps: int = 2000
-    eval_steps: int = 1000
+    save_steps: int = 100
+    eval_steps: int = 50
     use_spaces: bool = False
 
     data_dir: Path = BASE_DIR / "Ciphers"
