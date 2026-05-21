@@ -55,8 +55,14 @@ class JambaTrainingPipeline:
     def _initialize_model(self) -> JambaForCausalLM:
         """Instantiate the Jamba model using the configuration dataclass."""
         logger.info("Initializing Model...")
-        jamba_config = JambaConfig(**self.cfg.jamba_config.__dict__)
-        model = JambaForCausalLM(jamba_config)
+
+        config_dict = self.cfg.jamba_config.__dict__.copy()
+        attn_impl = config_dict.pop("attn_implementation", "flash_attention_2")
+
+        hf_config = JambaConfig(**config_dict)
+        hf_config._attn_implementation = attn_impl
+        model = JambaForCausalLM(hf_config)
+
         logger.info(f"Model initialized. Parameters: {model.num_parameters()}")
         return model.bfloat16()
 
@@ -67,6 +73,7 @@ class JambaTrainingPipeline:
             per_device_train_batch_size=self.cfg.batch_size,
             gradient_accumulation_steps=self.cfg.grad_accum,
             gradient_checkpointing=self.cfg.grad_checkpoint,
+            gradient_checkpointing_kwargs={"use_reentrant": False},
             num_train_epochs=self.cfg.epochs,
             learning_rate=self.cfg.learning_rate,
             logging_steps=self.cfg.log_steps,
@@ -74,6 +81,11 @@ class JambaTrainingPipeline:
             eval_steps=self.cfg.eval_steps,
             save_strategy="steps",
             save_steps=self.cfg.save_steps,
+            save_total_limit=2,
+            ignore_data_skip=True,
+            load_best_model_at_end=True,
+            greater_is_better=False,
+            metric_for_best_model="eval_loss",
             bf16=self.cfg.bf16,
             push_to_hub=False,
             report_to="none",
@@ -96,14 +108,31 @@ class JambaTrainingPipeline:
     def run(self) -> None:
         """Execute the training loop, handling checkpoints and final model saving."""
         output_dir_str = str(self.cfg.output_dir)
-        last_checkpoint = get_last_checkpoint(output_dir_str)
 
+        # 1. Define your custom UCloud checkpoint path
+        # Note: Since your train.sh does `cd /work/jamba`, `../Models/Jamba/` 
+        # resolves to `/work/Models/Jamba/`. Using absolute paths is often safer.
+        custom_checkpoint_dir = "../Models/Jamba/"
+
+        # 2. Check the custom path first
+        last_checkpoint = None
+        if os.path.exists(custom_checkpoint_dir):
+            # get_last_checkpoint looks for "checkpoint-XXXX" folders inside the given directory
+            last_checkpoint = get_last_checkpoint(custom_checkpoint_dir)
+
+        # 3. Fallback to the standard output directory if nothing was in the custom path
+        if last_checkpoint is None:
+            last_checkpoint = get_last_checkpoint(output_dir_str)
+
+        # 4. Standard resume logic
         if last_checkpoint is not None:
             logger.info(f"Found checkpoint: {last_checkpoint}. Resuming...")
-            self.checkpoint_manager.prepare_for_fast_path(output_dir_str)
+            # Keep this pointing to output_dir_str assuming your manager uses it for current run state
+            self.checkpoint_manager.prepare_for_fast_path(output_dir_str) 
         else:
-            logger.warning("No checkpoint found. Starting training from scratch.")
+            logger.warning(f"No checkpoint found in {custom_checkpoint_dir} or {output_dir_str}. Starting training from scratch.")
 
+        # 5. Pass the located checkpoint path directly to the trainer
         self.trainer.train(resume_from_checkpoint=last_checkpoint)
 
         if self.trainer.is_world_process_zero():

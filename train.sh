@@ -46,6 +46,7 @@ fi
 
 uv pip install -e .
 uv pip install hf_transfer
+uv pip install https://github.com/mjun0812/flash-attention-prebuild-wheels/releases/download/v0.9.0/flash_attn-2.8.3+cu130torch2.10-cp312-cp312-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl
 
 MASTER_PORT=$((10000 + $RANDOM % 20000))
 

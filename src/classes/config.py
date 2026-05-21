@@ -2,6 +2,7 @@ import os
 from dataclasses import dataclass, field
 from pathlib import Path
 import json
+import torch
 
 from utils.logging import get_logger
 
@@ -34,11 +35,12 @@ class JambaConfig:
         use_mamba_kernels (bool): Whether to use Mamba kernels.
         use_cache (bool): Whether to use caching in the model.
         max_position_embeddings (int): Maximum context length.
+        attn_implementation (str): Attention mechanism.
 
     """
 
     vocab_size: int = 0
-    hidden_size: int = 256
+    hidden_size: int = 288
     num_hidden_layers: int = 8
     num_attention_heads: int = 8
     num_key_value_heads: int = 2
@@ -51,6 +53,12 @@ class JambaConfig:
     use_mamba_kernels: bool = True
     use_cache: bool = False
     max_position_embeddings: int = 0
+    attn_implementation: str = "sdpa"
+    torch_dtype: torch.dtype = torch.bfloat16
+    sep_token_id: int = field(init=False)
+    eos_token_id: int = field(init=False)
+    bos_token_id: int = field(init=False)
+    pad_token_id: int = field(init=False)
 
 
 @dataclass
@@ -126,16 +134,12 @@ class Config:
     @property
     def is_valid_init(self) -> bool:
         """Is valid based on initialization."""
-        return (
-            self.jamba_config.vocab_size != 0 and
-            self.max_context != 0 and
-            self.unique_homophones != 0
-        )
+        return self.jamba_config.vocab_size > 0 and self.max_context > 0 and self.unique_homophones > 0
 
     jamba_config: JambaConfig = field(default_factory=JambaConfig)
 
-    batch_size: int = 2
-    grad_accum: int = 8
+    batch_size: int = 4
+    grad_accum: int = 1
     learning_rate: float = 3e-4
     epochs: int = 3
 
@@ -144,8 +148,8 @@ class Config:
     dataloader_num_workers: int = 4
 
     log_steps: int = 50
-    save_steps: int = 1000
-    eval_steps: int = 1000
+    save_steps: int = 250000
+    eval_steps: int = 250000
     use_spaces: bool = False
 
     data_dir: Path = BASE_DIR / "Ciphers"
@@ -159,13 +163,13 @@ class Config:
     @property
     def training_dir(self) -> Path:
         """Directory containing the training dataset."""
-        folder = "tokenized_spaced" if self.use_spaces else "tokenized_normal"
+        folder = "tokenized_spaced_truncated_4000" if self.use_spaces else "tokenized_normal_truncated_4000"
         return self.data_dir / folder / "Training"
 
     @property
     def validation_dir(self) -> Path:
         """Directory containing the validation dataset."""
-        folder = "tokenized_spaced" if self.use_spaces else "tokenized_normal"
+        folder = "tokenized_spaced_truncated_4000" if self.use_spaces else "tokenized_normal_truncated_4000"
         return self.data_dir / folder / "Validation"
 
     def load_homophones(self, homophone_file: str = "metadata.json") -> None:
@@ -173,8 +177,7 @@ class Config:
         homophone_path = self.data_dir / homophone_file
         if not os.path.exists(homophone_path):
             raise FileNotFoundError(
-                f"Metadata file not found at: {homophone_path}. "
-                "Cannot determine unique_homophones — aborting.",
+                f"Metadata file not found at: {homophone_path}. Cannot determine unique_homophones — aborting.",
             )
         try:
             with open(homophone_path) as f:
@@ -188,8 +191,12 @@ class Config:
             ) from e
 
         self.jamba_config.vocab_size = self.char_offset + self.unique_letters + 1
+        self.jamba_config.sep_token_id = self.sep_token_id
+        self.jamba_config.eos_token_id = self.eos_token_id
+        self.jamba_config.bos_token_id = self.bos_token_id
+        self.jamba_config.pad_token_id = self.pad_token_id
 
     def __post_init__(self) -> None:
         """Post init hook."""
         self.load_homophones()
-        self.max_position_embeddings = self.max_context + BUFFER
+        self.jamba_config.max_position_embeddings = self.max_context + BUFFER

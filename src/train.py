@@ -1,7 +1,7 @@
 import argparse
+
 from classes.trainer import JambaTrainingPipeline
 from classes.config import Config
-
 
 def main() -> None:
     """Execute the training loop, handling checkpoints and final model saving."""
@@ -18,6 +18,8 @@ def main() -> None:
     cfg = Config()
 
     cfg.use_spaces = args.spaced
+
+    print(f"Token IDs - BOS: {cfg.bos_token_id}, EOS: {cfg.eos_token_id}, SEP: {cfg.sep_token_id}, SPACE: {cfg.space_token_id}")
 
     if not cfg.is_valid_init:
         raise ValueError(
